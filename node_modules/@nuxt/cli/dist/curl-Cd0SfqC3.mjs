@@ -1,0 +1,378 @@
+import { h as defineCommand, l as rootDirArgs } from "./_shared-YyGADOl7.mjs";
+import { u as logger } from "./startup-clock-DXZlxuSA.mjs";
+import { i as logNetworkError } from "./path-env-D9Xd_BAN.mjs";
+import { i as resolveRootDir } from "./paths-DlXZaaIg.mjs";
+import { r as noDevServerMessage, t as findDevServer } from "./dev-server-C7zAaNG-.mjs";
+import { t as highlight } from "./highlight-CNtoRxLK.mjs";
+import process from "node:process";
+import { styleText } from "node:util";
+import { note } from "@clack/prompts";
+import { readFile } from "node:fs/promises";
+import { Buffer } from "node:buffer";
+//#region src/utils/format-html.ts
+/** Phrasing content, kept on the line of its surrounding text. */
+const INLINE = /* @__PURE__ */ new Set([
+	"a",
+	"abbr",
+	"b",
+	"bdi",
+	"bdo",
+	"br",
+	"cite",
+	"code",
+	"data",
+	"dfn",
+	"em",
+	"i",
+	"img",
+	"kbd",
+	"mark",
+	"q",
+	"rp",
+	"rt",
+	"ruby",
+	"s",
+	"samp",
+	"small",
+	"span",
+	"strong",
+	"sub",
+	"sup",
+	"time",
+	"u",
+	"var",
+	"wbr"
+]);
+const VOID = /* @__PURE__ */ new Set([
+	"area",
+	"base",
+	"br",
+	"col",
+	"embed",
+	"hr",
+	"img",
+	"input",
+	"link",
+	"meta",
+	"param",
+	"source",
+	"track",
+	"wbr"
+]);
+/** Elements whose content is text rather than markup, and so is never reindented. */
+const RAW = /* @__PURE__ */ new Set([
+	"pre",
+	"textarea",
+	"script",
+	"style"
+]);
+const NODE_RE = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<[!/]?[a-z](?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+const TAG_NAME_RE = /^<\/?\s*([a-z][\w:-]*)/i;
+/**
+* Reindent an HTML document so a minified response is readable.
+*
+* Only whitespace between block-level boundaries is rewritten. Inline elements
+* keep their surrounding text, and `pre`, `textarea`, `script` and `style`
+* bodies are copied verbatim, so what a browser renders does not change.
+*/
+function formatHtml(html, indent = "  ") {
+	const lines = [];
+	const stack = [];
+	let line = "";
+	let position = 0;
+	const pad = () => indent.repeat(stack.length);
+	const push = (text) => {
+		lines.push(pad() + text.replace(/\n[^\S\n]*/g, `\n${pad()}`));
+	};
+	const flush = () => {
+		if (line.trim()) push(line.trim());
+		line = "";
+	};
+	NODE_RE.lastIndex = 0;
+	let match;
+	while (match = NODE_RE.exec(html)) {
+		line += html.slice(position, match.index);
+		position = NODE_RE.lastIndex;
+		const node = match[0];
+		const name = TAG_NAME_RE.exec(node)?.[1]?.toLowerCase();
+		if (!name || INLINE.has(name)) {
+			line += node;
+			continue;
+		}
+		const closing = node[1] === "/";
+		const selfClosing = node.endsWith("/>") || VOID.has(name);
+		if (RAW.has(name) && !closing && !selfClosing) {
+			const rest = html.slice(position);
+			const end = new RegExp(`</${name}\\s*>`, "i").exec(rest);
+			const body = end ? rest.slice(0, end.index + end[0].length) : rest;
+			flush();
+			lines.push(pad() + node + body);
+			position += body.length;
+			NODE_RE.lastIndex = position;
+			continue;
+		}
+		if (closing) {
+			const index = stack.findLastIndex((entry) => entry.name === name);
+			if (index === -1) {
+				flush();
+				push(node);
+				continue;
+			}
+			const open = stack[index];
+			if (index === stack.length - 1 && open.line === lines.length && line.trim() && !line.includes("\n")) {
+				lines[open.line - 1] += `${line.trim()}${node}`;
+				line = "";
+				stack.length = index;
+				continue;
+			}
+			flush();
+			stack.length = index;
+			push(node);
+			continue;
+		}
+		flush();
+		push(node);
+		if (!selfClosing) stack.push({
+			name,
+			line: lines.length
+		});
+	}
+	line += html.slice(position);
+	flush();
+	return lines.join("\n");
+}
+//#endregion
+//#region src/commands/curl.ts
+const HAS_SCHEME_RE = /^[a-z][a-z\d+.-]*:\/\//i;
+const JSON_CONTENT_TYPE_RE = /^application\/(?:[\w.+-]+\+)?json\b/i;
+/** Markup reindented as HTML: the HTML rules cover XML documents too. */
+const MARKUP_CONTENT_TYPE_RE = /^(?:text\/(?:html|xml)|(?:application|image)\/(?:[\w.+-]+\+)?xml)\b/i;
+/** Newline-delimited JSON keeps one record per line, so each line is highlighted on its own. */
+const NDJSON_CONTENT_TYPE_RE = /^application\/(?:(?:x-)?ndjson|jsonl)\b/i;
+/** Languages worth highlighting a response body in, keyed by content type. */
+const CONTENT_TYPE_LANGUAGES = [
+	[/^text\/(?:x-)?markdown\b/i, "md"],
+	[/^(?:text|application)\/(?:x-)?(?:[\w.+-]+\+)?ya?ml\b/i, "yaml"],
+	[/^text\/css\b/i, "css"],
+	[/^(?:text|application)\/(?:x-)?(?:java|ecma)script\b/i, "js"],
+	[/^(?:text|application)\/(?:x-)?typescript\b/i, "ts"],
+	[/^(?:text\/x-(?:diff|patch)|application\/x-patch)\b/i, "diff"],
+	[/^(?:text\/x-(?:sh|shellscript)|application\/x-sh(?:ellscript)?)\b/i, "bash"],
+	[/^(?:text|application)\/x-python\b/i, "py"],
+	[/^message\/http\b/i, "http"]
+];
+/** Textual types with no highlighter of their own. */
+const TEXT_CONTENT_TYPE_RE = /^(?:text\/|application\/x-www-form-urlencoded\b)/i;
+const BINARY_SNIFF_BYTES = 4096;
+/** `curl --fail` uses 22 for an HTTP error response; scripts rely on it. */
+const HTTP_ERROR_EXIT_CODE = 22;
+var curl_default = defineCommand({
+	meta: {
+		name: "curl",
+		description: "Send an HTTP request to your running Nuxt dev server"
+	},
+	args: {
+		url: {
+			type: "positional",
+			description: "Absolute URL, or a path resolved against the running dev server",
+			valueHint: "url|path"
+		},
+		...rootDirArgs,
+		method: {
+			type: "string",
+			alias: "X",
+			description: "HTTP method (default: GET, or POST when a body is provided)",
+			valueHint: "method"
+		},
+		header: {
+			type: "string",
+			alias: "H",
+			description: "Request header in `Name: Value` form. Can be repeated.",
+			valueHint: "header",
+			multiple: true
+		},
+		data: {
+			type: "string",
+			alias: "d",
+			description: "Request body. Use `@-` to read stdin and `@<file>` to read a file.",
+			valueHint: "data"
+		},
+		include: {
+			type: "boolean",
+			alias: "i",
+			description: "Include the response status line and headers in the output"
+		},
+		head: {
+			type: "boolean",
+			alias: "I",
+			description: "Send a `HEAD` request and show only the response headers"
+		},
+		verbose: {
+			type: "boolean",
+			alias: "v",
+			description: "Print request and response headers to stderr"
+		},
+		pretty: {
+			type: "boolean",
+			description: "Reindent and syntax-highlight output (default: on for a terminal, off when piped). Use `--pretty`/`--no-pretty` to force reindenting."
+		}
+	},
+	async run(ctx) {
+		const cwd = resolveRootDir(ctx.args);
+		const input = ctx.args.url;
+		if (!input) {
+			logger.error(`Missing URL. Try ${styleText("cyan", "nuxt curl /")}.`);
+			process.exit(1);
+		}
+		const url = await resolveRequestUrl(input, cwd);
+		const headers = new Headers();
+		for (const header of ctx.args.header) {
+			const separator = header.indexOf(":");
+			if (separator <= 0) {
+				logger.error(`Invalid header ${styleText("cyan", header)}. Expected ${styleText("cyan", "Name: Value")}.`);
+				process.exit(1);
+			}
+			headers.append(header.slice(0, separator).trim(), header.slice(separator + 1).trim());
+		}
+		if (!headers.has("user-agent")) headers.set("user-agent", "nuxt-cli");
+		const body = await readRequestBody(ctx.args.data);
+		if (body !== void 0 && !headers.has("content-type") && isJson(body)) headers.set("content-type", "application/json");
+		const defaultMethod = ctx.args.head ? "HEAD" : body === void 0 ? "GET" : "POST";
+		const method = (ctx.args.method || defaultMethod).toUpperCase();
+		if (body !== void 0 && (method === "GET" || method === "HEAD")) {
+			logger.error(`A ${styleText("cyan", method)} request cannot have a body. Remove ${styleText("cyan", "-d")} or use a different method.`);
+			process.exit(1);
+		}
+		if (ctx.args.verbose) {
+			process.stderr.write(`> ${method} ${url.pathname}${url.search} HTTP/1.1\n`);
+			process.stderr.write(`> Host: ${url.host}\n`);
+			for (const [name, value] of headers) process.stderr.write(`> ${name}: ${value}\n`);
+			process.stderr.write(">\n");
+		}
+		let response;
+		try {
+			response = await fetch(url, {
+				method,
+				headers,
+				body,
+				redirect: "manual"
+			});
+		} catch (error) {
+			logNetworkError(error, { url: url.href });
+			process.exit(1);
+		}
+		const pretty = ctx.args.pretty ?? Boolean(process.stdout.isTTY);
+		if (ctx.args.verbose) process.stderr.write(formatResponseHead(response, "< ", process.stderr, ctx.args.pretty ?? Boolean(process.stderr.isTTY)));
+		if (ctx.args.include || ctx.args.head) process.stdout.write(formatResponseHead(response, "", process.stdout, pretty));
+		await writeResponseBody(response, pretty);
+		if (!response.ok) process.exit(HTTP_ERROR_EXIT_CODE);
+	}
+});
+async function resolveRequestUrl(input, cwd) {
+	if (HAS_SCHEME_RE.test(input)) return new URL(input);
+	const server = await findDevServer(cwd);
+	if (!server) {
+		logger.error(noDevServerMessage("nuxt curl"));
+		process.exit(1);
+	}
+	return new URL(input.startsWith("/") ? input : `/${input}`, server.url);
+}
+async function readRequestBody(data) {
+	if (data === void 0) return;
+	if (data === "@-") {
+		const chunks = [];
+		for await (const chunk of process.stdin) chunks.push(chunk);
+		return Buffer.concat(chunks).toString("utf-8");
+	}
+	if (data.startsWith("@")) {
+		const path = data.slice(1);
+		try {
+			return await readFile(path, "utf-8");
+		} catch (error) {
+			logger.error(`Could not read ${styleText("cyan", path)}: ${error.message}`);
+			process.exit(1);
+		}
+	}
+	return data;
+}
+function statusStyle(status) {
+	if (status >= 500) return "red";
+	if (status >= 400) return "yellow";
+	if (status >= 300) return "cyan";
+	return "green";
+}
+function formatResponseHead(response, prefix, stream, pretty) {
+	const paint = (style, text) => pretty ? styleText(style, text, { stream }) : text;
+	const status = paint(statusStyle(response.status), `${response.status} ${response.statusText}`.trimEnd());
+	let head = `${prefix}${paint("dim", "HTTP/1.1")} ${status}\n`;
+	for (const [name, value] of response.headers) head += `${prefix}${paint("blue", name)}: ${value}\n`;
+	return `${head}${prefix.trimEnd()}\n`;
+}
+async function writeResponseBody(response, pretty) {
+	const contentType = response.headers.get("content-type") || "";
+	const buffer = Buffer.from(await response.arrayBuffer());
+	if (!buffer.length) return;
+	if (!pretty) {
+		process.stdout.write(buffer);
+		return;
+	}
+	const renderer = resolveRenderer(contentType);
+	if (isBinary(buffer, contentType, renderer)) {
+		note("Binary data not shown in terminal. Redirect the output to a file to save it.", "Response body");
+		return;
+	}
+	const text = decodeBody(buffer, contentType);
+	const body = renderer?.(text) ?? text;
+	process.stdout.write(body);
+	if (!body.endsWith("\n")) process.stdout.write("\n");
+}
+/** Decode with the charset the response declares, falling back to UTF-8 when it is absent or unknown. */
+function decodeBody(buffer, contentType) {
+	const charset = /;\s*charset=["']?([\w-]+)/i.exec(contentType)?.[1];
+	if (charset) try {
+		return new TextDecoder(charset).decode(buffer);
+	} catch {}
+	return buffer.toString("utf-8");
+}
+/**
+* A content type we can render, or one matching `TEXT_CONTENT_TYPE_RE`, is
+* trusted outright; anything else is sniffed for a NUL byte, which no valid
+* UTF-8 text response contains.
+*/
+function isBinary(buffer, contentType, renderer) {
+	if (renderer || TEXT_CONTENT_TYPE_RE.test(contentType)) return false;
+	return buffer.subarray(0, BINARY_SNIFF_BYTES).includes(0);
+}
+function renderJson(text) {
+	let json;
+	try {
+		json = JSON.stringify(JSON.parse(text), null, 2);
+	} catch {
+		return text;
+	}
+	return highlight(json, "json");
+}
+/**
+* How to render a response body of `contentType`, or `undefined` to print it
+* verbatim. Recognising a renderer is also what marks a type as text, so
+* `isBinary` never sniffs something we already know how to highlight.
+*/
+function resolveRenderer(contentType) {
+	if (JSON_CONTENT_TYPE_RE.test(contentType)) return renderJson;
+	if (NDJSON_CONTENT_TYPE_RE.test(contentType)) return (text) => text.replace(/[^\n]+/g, (line) => highlight(line, "json"));
+	if (MARKUP_CONTENT_TYPE_RE.test(contentType)) return (text) => highlight(formatHtml(text), "html");
+	const language = CONTENT_TYPE_LANGUAGES.find(([pattern]) => pattern.test(contentType))?.[1];
+	return language ? (text) => highlight(text, language) : void 0;
+}
+function isJson(value) {
+	const trimmed = value.trimStart();
+	if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return false;
+	try {
+		JSON.parse(value);
+		return true;
+	} catch {
+		return false;
+	}
+}
+//#endregion
+export { curl_default as default };

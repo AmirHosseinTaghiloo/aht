@@ -1,0 +1,267 @@
+# my-bad
+
+[![npm version][npm-version-src]][npm-version-href]
+[![npm downloads][npm-downloads-src]][npm-downloads-href]
+[![Github Actions][github-actions-src]][github-actions-href]
+[![Codecov][codecov-src]][codecov-href]
+
+> Beautiful dev-server error pages rendered to HTML, ANSI or JSON and live updated over SSE. ✨
+
+`my-bad` turns an error into a plain JSON error report with sourcemapped frames, snippets, causes, component trace and request context.
+
+You can then use `my-bad` to render that report as a full HTML page, a shadow-DOM overlay for an existing page, or ANSI for the terminal. A small SSE channel keeps browser-based pages live, meaning errors can be updated, the page can reload when the error is fixed, and additional warnings and server logs are surfaced as they occur.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/danielroe/my-bad/main/assets/page-dark.png">
+  <img src="https://raw.githubusercontent.com/danielroe/my-bad/main/assets/page-light.png" alt="An error page showing the error name, message, hint, component trace and a syntax-highlighted source snippet with the failing line marked">
+</picture>
+
+The same report, rendered to the terminal with `renderAnsi`:
+
+<img src="https://raw.githubusercontent.com/danielroe/my-bad/main/assets/ansi.svg" alt="Terminal output showing the error, a hint, the component trace, source snippets for the error and its cause, and the collapsed stack frames">
+
+## Install
+
+```sh
+npm install my-bad
+```
+
+## Usage
+
+```ts
+import { createReport, fsLoader, renderAnsi, renderPage } from 'my-bad'
+import { nuxtPreset } from 'my-bad/presets'
+
+const report = await createReport(error, {
+  cwd: process.cwd(),
+  loaders: [fsLoader()],
+  presets: [nuxtPreset({ versions: { nuxt: '4.0.0' } })],
+  context: { event },
+})
+
+console.error(renderAnsi(report))
+
+if (req.headers.accept?.includes('text/html')) {
+  res.end(renderPage(report, { cwd: process.cwd(), channel: '/__my-bad' }))
+}
+else {
+  res.end(JSON.stringify(report))
+}
+```
+
+### Diagnostics
+
+An error that carries its own guidance is read without any configuration. `fix` becomes the report's `hint`, a `docs` URL becomes `docsUrl`, and `sources` (`file:line:column` strings) become app frames with snippets, or a `Sources` section when they cannot be resolved to a readable file. An error named after its own `code` is treated as self-describing: the heading shows the code once, and presets leave its `docsUrl` alone, including when it has none.
+
+```ts
+class Diagnostic extends Error {
+  name = 'NUXT_E1001'
+  code = 'NUXT_E1001'
+  fix = 'Pass a non-empty `name` prop to `<Widget>`.'
+  docs = 'https://nuxt.com/docs/4.x/errors/e1001'
+  sources = ['pages/index.vue:2:16']
+}
+```
+
+`environment` labels where the error happened (`'Server'`, `'Client'`, or whatever your integration calls it) next to the error name.
+
+### Overlay
+
+Inject the error UI into an existing page (for example a framework's rendered error page). It renders in a shadow root, so host styles cannot leak in, and can be minimised to a picture-in-picture thumbnail so the user can see the page behind it.
+
+```ts
+import { injectOverlay } from 'my-bad'
+
+html = injectOverlay(html, report, { channel: '/__my-bad', startMinimized: status < 500 })
+```
+
+`startMinimized: true` always mounts minimised, even if the user last expanded an overlay in this origin. Errors arriving over the channel leave the current minimised state alone.
+
+Pass `requestId` alongside the same id given to `channel.setError` so the channel only sends this page the errors its own request produced. Without it the page's path is matched against the request instead. Errors published with no request (compile errors, client runtime errors) reach every page.
+
+Use `injectOverlay` rather than `html.replace('</body>', ...)`: the inlined client contains `$` sequences that a string replacement would interpret.
+
+### Serving the client separately
+
+`renderPage` and `renderOverlay` inline the client script and stylesheet, which makes the output self-contained at the cost of ~60kB per response. Serve `clientAssets` yourself and pass the URLs to keep them out of the HTML and let the browser cache them:
+
+```ts
+import { clientAssets, renderPage } from 'my-bad'
+
+// GET /__my-bad/client.js  -> clientAssets.script (text/javascript)
+// GET /__my-bad/client.css -> clientAssets.styles (text/css)
+renderPage(report, { assets: { script: '/__my-bad/client.js', styles: '/__my-bad/client.css' } })
+```
+
+Theme overrides stay inline, so a shared stylesheet still themes per response.
+
+### Theming
+
+The page is dark by default and follows `prefers-color-scheme`. Everything is derived from a handful of CSS custom properties, so it's possible to restyle it without forking the stylesheet:
+
+```ts
+import { renderPage } from 'my-bad'
+import { nuxtTheme } from 'my-bad/presets'
+
+renderPage(report, { theme: nuxtTheme })
+
+renderPage(report, {
+  theme: {
+    name: 'Acme',
+    url: 'https://acme.dev',
+    logo: '<svg viewBox="0 0 32 32">…</svg>', // drawn at 20px in currentColor
+    accent: '#ff4f81',
+    vars: { '--mb-bg': '#0b0b12', '--mb-font-sans': 'Inter, sans-serif' },
+    css: '.mb-name { text-transform: uppercase }',
+    scheme: 'dark', // force a scheme instead of following the user
+  },
+})
+```
+
+Tokens: `--mb-accent`, `--mb-bg`, `--mb-fg`, `--mb-font-sans`, `--mb-font-mono`, `--mb-radius`, plus the `--mb-tk-*` syntax colours. Text tiers, hairlines and surfaces are mixed from those, and the accent is deepened automatically for small text on light backgrounds.
+
+### Sourcemaps
+
+Frames are mapped by loaders, tried in order:
+
+- `fsLoader()` reads `.map` sidecars and inline `sourceMappingURL` comments (Nitro dev builds, tsdown/rollup output). When the frames can come from an untrusted source, such as a browser-submitted stack, confine it with `fsLoader({ roots: [cwd] })` or `fsLoader({ canRead })`; it reads any absolute path by default.
+- `sourceMapLoader({ getSourceMap })` takes maps from memory, for module runners (`nitroApp.ssrSourceMaps.getSourceMap` in Nuxt, `runner.moduleCache.getSourceMap` in vite-node).
+- `viteLoader(server)` from `my-bad/vite` uses the module graph of a `ViteDevServer`.
+- `passthroughLoader()` only reads sources, for processes whose stacks are already mapped.
+
+A frame is only mapped when the map has a segment on that exact generated line, so already-mapped stacks are never mapped twice.
+
+Compile errors from a bundler often point into the module it transformed while naming the source file (rolldown failing to parse a compiled render function, say). Their position and code frame then move to `frame.compiled`, so the generated code is labelled as such rather than shown as the source of your file.
+
+That is detected by comparing the frame's **caret line**, the one line the frame asserts describes the reported position, against the file on disk at the line number the frame gives it. Indentation is ignored, and a line Vite truncated for width is matched on the part that survived. If it matches, the frame is source; if it does not, the frame is generated. Neighbouring lines are not compared, because a bare `}` or `})` matches almost any file by chance. Nothing changes when the file cannot be read, or the caret line is only punctuation, or there is no caret at all.
+
+A thrower that already knows better can say so, and is believed without any comparison. This is honoured wherever the error sits in the chain, including as a `cause` at any depth, which is how a compile error wrapped in an `HTTPError` gets it right:
+
+```ts
+throw Object.assign(error, { compiled: true })
+```
+
+The same thing is available as an option for the top-level input, where `compiled: { sourceLoc }` also supplies a position you have mapped back to source yourself, to get a source snippet alongside the generated one:
+
+```ts
+await createReport(error, { kind: 'compile', compiled: { sourceLoc: { line: 6, column: 16 } } })
+```
+
+A marker on the error wins over the option, and both win over detection in either direction (`false` opts out entirely, and the file is not read).
+
+### Terminal
+
+```ts
+console.error(renderAnsi(report, { cwd, icon: false })) // `icon: false` when your logger prints its own badge
+```
+
+File locations are OSC 8 hyperlinks (via `clickable-path`) in terminals that support them.
+
+### Syntax highlighting
+
+Snippets use a small built-in tokenizer. Plug in your own for richer colours in both HTML and ANSI:
+
+```ts
+const report = await createReport(error, {
+  tokenizer: (line, lang) => myHighlighter(line, lang).map(token => ({ type: 'keyword', text: token.value })),
+})
+```
+
+
+### Live channel
+
+```ts
+import { createChannel } from 'my-bad/channel'
+import { fileSink } from 'my-bad/sinks'
+
+const channel = createChannel({ open: true, sink: fileSink('.nuxt/my-bad.jsonl') })
+// `open: true` launches `LAUNCH_EDITOR` / `VISUAL` / `EDITOR` at the frame's line, falling back to the OS default app
+// `open` requests are confined to `root` (default `process.cwd()`; the Vite plugin uses `server.fs.allow`),
+// must name an existing file, and must be `application/json`; pass `root: false` to allow any path
+// `open` may be a function instead, returning `false` to refuse a request
+
+// The channel refuses requests a page on another origin made (`Sec-Fetch-Site`, else `Origin` must match the
+// host addressed), and browser requests addressed to a host that is neither an IP literal, `localhost`,
+// `*.localhost`, nor listed in `allowedHosts` (the Vite plugin passes `server.allowedHosts`).
+// Requests with neither header (`curl`, editor integrations) are allowed.
+
+// Node: mount at the channel base path
+server.on('request', (req, res) => channel.handler(req, res).then(handled => handled || next()))
+// or fetch-style: await channel.fetchHandler(request)
+
+// Callers are trusted by default and may browse every retained report. Pass `{ trusted: false }` for a peer
+// the host cannot vouch for (a connection forwarded into a container, a `--host` binding): the channel still
+// connects and streams, but its `hello.history` and the `history` payloads hold only the reports that concern
+// the page (a report naming a request id is matched by that id alone, never by path), `/history/:id` answers
+// 404 for any other report, log entries reach it only when attributed to a request that concerns it, and
+// privileged actions such as `open` are neither advertised nor accepted, so the
+// page opens an `editor://` URL on the machine running the browser instead.
+await channel.handler(req, res, { trusted: isLoopback(req) })
+
+channel.setError(report) // pages swap content in place
+channel.setError(report, requestId, `${method} ${url}`) // only pages rendered for that request swap; the rest list it in their history
+channel.clearError() // pages reload, overlays dismiss
+channel.warn(report) // toast
+channel.log({ level: 'warn', text: 'careful' }) // streamed to the log drawer of trusted callers
+channel.log({ level: 'warn', text: 'careful' }, requestId, `${method} ${url}`) // also streamed to the pages that request concerns
+channel.progress({ phase: 'build', percent: 40, message: 'Building server' }) // progress bar
+```
+
+### Vite
+
+```ts
+import { myBad, useMyBad } from 'my-bad/vite'
+
+export default defineConfig({ plugins: [myBad()] })
+```
+
+The plugin maps frames through Vite's module graph, forwards compile errors from the HMR channel as `kind: 'compile'` reports, mounts the channel at `/__my-bad`, injects a tiny client into `index.html` so a running app shows the overlay, and clears it when the next update succeeds. Use `useMyBad(server)` from your own SSR middleware to build reports and pages with the same configuration.
+
+The client script and stylesheet are served from `/__my-bad/client.js` and `/__my-bad/client.css` with content-hashed URLs, rather than inlined into every error page. Pass `inlineClient: true` for self-contained output.
+
+## Presets
+
+`my-bad/presets` exports `envPreset`, `vuePreset`, `requestPreset` (alias `h3Preset`), `nitroPreset` and `nuxtPreset`. Presets contribute frame classification, sections (request, headers with redaction, route, environment), component traces and docs links for error codes.
+
+`nuxtPreset` links codes such as `E1001` or `NUXT_E1001` to `https://nuxt.com/docs/errors/e1001`, which redirects to the current version; pass `docsBase` to point elsewhere.
+
+## 💻 Development
+
+```bash
+git clone git@github.com:danielroe/my-bad.git
+corepack enable
+
+# run interactive tests
+pnpm dev
+# run accessibility audit (computed contrast, axe-core, target sizes, focus, motion, reflow)
+pnpm test:a11y
+# render screenshots of the ui
+pnpm screenshot
+
+# re-render the README assets in assets/ (autofix.ci keeps these current)
+pnpm assets
+# experiment in the playground
+pnpm play
+pnpm play:vite
+```
+
+## Credits
+
+This was inspired by [youch](https://github.com/poppinss/youch), which is a phenomenal error page generator, and I would highly recommend it!
+
+## License
+
+Made with ❤️
+
+Published under [MIT License](./LICENCE).
+
+<!-- Badges -->
+
+[npm-version-src]: https://npmx.dev/api/registry/badge/version/my-bad
+[npm-version-href]: https://npmx.dev/package/my-bad
+[npm-downloads-src]: https://npmx.dev/api/registry/badge/downloads/my-bad
+[npm-downloads-href]: https://npm.chart.dev/my-bad
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/danielroe/my-bad/ci.yml?branch=main&style=flat-square
+[github-actions-href]: https://github.com/danielroe/my-bad/actions?query=workflow%3Aci
+[codecov-src]: https://img.shields.io/codecov/c/gh/danielroe/my-bad/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/danielroe/my-bad

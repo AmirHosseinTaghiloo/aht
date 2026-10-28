@@ -1,0 +1,68 @@
+// Spec: https://www.w3.org/TR/css-values-4/#calc-simplification
+// One top-down pass over a canonical AST. Per-concern fold modules in
+// ./simplify/; this file is the entry + dispatch only.
+
+import { simplifySum } from './simplify/sum.js';
+import { simplifyProduct } from './simplify/product.js';
+import { simplifyCall } from './simplify/call.js';
+import { simplifyComponents } from './opaque.js';
+import { groupSubstitution, opaqueCall } from './node.js';
+import { isCalculationFunction } from './functions.js';
+import { assertDepth } from './limits.js';
+
+/**
+ * @typedef {import('./node.js').Node} Node
+ *
+ * Recursive simplifier reference, threaded into Sum/Product/Call/OpaqueCall. Lets
+ * leaf fold modules avoid circular imports of the entry function.
+ * @typedef {(node: Node) => Node} SimplifyFn
+ */
+
+/**
+ * A nested calc() is a parenthesized group: with unresolved tokens inside,
+ * its operands must not merge into the surrounding sum or product.
+ * @param {Node} value
+ * @param {(value: Node) => Node} child
+ * @return {Node}
+ */
+function operand(value, child) {
+  const result = child(value);
+  return value.type === 'Call' && isCalculationFunction(value.name)
+    ? groupSubstitution(result)
+    : result;
+}
+
+/**
+ * Simplify is an independent, composable AST transformation. It may
+ * synthesize canonical nodes while preserving the Node -> Node contract.
+ * @param {Node} node
+ * @param {number | false} [precision] When set, divisions and unit
+ *   conversions that are not exact at this precision stay symbolic.
+ * @param {number} [depth]
+ * @return {Node}
+ */
+function simplify(node, precision = false, depth = 0) {
+  assertDepth(depth);
+  /** @param {Node} value */
+  const child = (value) => simplify(value, precision, depth + 1);
+  switch (node.type) {
+    case 'Num':
+    case 'Dim':
+    case 'Ident':
+      return node;
+    case 'Call':
+      return simplifyCall(node, child);
+    case 'OpaqueCall':
+      return opaqueCall(
+        node.name,
+        simplifyComponents(node.components, child),
+        node.rawName
+      );
+    case 'Sum':
+      return simplifySum(node, (value) => operand(value, child), precision);
+    case 'Product':
+      return simplifyProduct(node, (value) => operand(value, child), precision);
+  }
+}
+
+export { simplify };

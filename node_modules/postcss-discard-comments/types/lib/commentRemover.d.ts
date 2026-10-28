@@ -1,0 +1,13 @@
+declare class CommentRemover {
+    #private;
+    options: import("../index.js").Options;
+    /** @param {import('../index.js').Options} options */
+    constructor(options: import('../index.js').Options);
+    /**
+     * @param {string} comment
+     * @return {boolean | undefined}
+     */
+    canRemove(comment: string): boolean | undefined;
+}
+export default CommentRemover;
+//# sourceMappingURL=commentRemover.d.ts.map

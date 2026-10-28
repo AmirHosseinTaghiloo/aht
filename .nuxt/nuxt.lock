@@ -1,0 +1,10 @@
+{
+  "pid": 4592,
+  "startedAt": 1793170490692,
+  "interactive": true,
+  "command": "dev",
+  "cwd": "C:/Users/AMT/Desktop/aht",
+  "port": 3000,
+  "hostname": "::1",
+  "url": "http://[::1]:3000"
+}

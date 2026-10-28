@@ -1,0 +1,13 @@
+{
+  "name": "@brc-dd/iron",
+  "version": "2.0.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js"
+  },
+  "publish": {
+    "exclude": [
+      "!."
+    ]
+  }
+}

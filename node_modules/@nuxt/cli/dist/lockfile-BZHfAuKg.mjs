@@ -1,0 +1,283 @@
+import { g as isInteractiveSession } from "./startup-clock-DXZlxuSA.mjs";
+import process from "node:process";
+import { join } from "pathe";
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+//#region src/utils/lockfile.ts
+const LOCK_FILENAME = "nuxt.lock";
+const OUTPUT_LOCK_DIRNAME = "node_modules/.cache/nuxt";
+const MAX_LOCK_AGE_MS = 864e5;
+const MAX_LOCK_CLOCK_SKEW_MS = 3e5;
+function isProcessAlive(pid) {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (err) {
+		return err.code === "EPERM";
+	}
+}
+/** Read the lock held for `buildDir`, if there is one. */
+function readLock(buildDir) {
+	return readLockFile(lockPathFor(buildDir));
+}
+function lockPathFor(buildDir) {
+	return join(buildDir, LOCK_FILENAME);
+}
+/** The lock on `buildDir` when another process is currently holding it. */
+function readActiveLock(buildDir) {
+	const info = readLock(buildDir);
+	return info && isLockActive(info) ? info : void 0;
+}
+/**
+* Remove a lock whose holder has gone away, so the next `acquireLock` is not
+* refused on behalf of a process that cannot come back. Liveness is the
+* caller's judgement: a dead PID is not the only way for a holder to be gone,
+* and the port a dev server recorded is the more reliable signal.
+*
+* The lock is re-read and matched on identity, so one that has been replaced
+* since the caller inspected it is left alone.
+*/
+function clearStaleLock(buildDir, info) {
+	const current = readLock(buildDir);
+	if (current?.pid === info.pid && current.startedAt === info.startedAt) tryUnlink(lockPathFor(buildDir));
+}
+/**
+* Record that `byPid` is taking the lock over, so the outgoing holder can
+* explain its own shutdown. Only ever annotates a lock owned by another
+* process, and never creates one.
+*/
+function markTakenOver(buildDir, byPid) {
+	const current = readLock(buildDir);
+	if (current && current.pid !== byPid) writeLockFile(lockPathFor(buildDir), {
+		...current,
+		takenOverBy: byPid
+	});
+}
+/**
+* Drop a takeover claim this process wrote, once it has given up on it. Another
+* process's claim is left alone.
+*/
+function clearTakeover(buildDir, byPid) {
+	const current = readLock(buildDir);
+	if (current?.takenOverBy === byPid) writeLockFile(lockPathFor(buildDir), {
+		...current,
+		takenOverBy: void 0
+	});
+}
+/** PID that claimed our own lock, if this process is being taken over. */
+function getTakeoverPid(buildDir) {
+	const current = readLock(buildDir);
+	if (!current || current.pid !== process.pid || !current.takenOverBy) return;
+	return isProcessAlive(current.takenOverBy) ? current.takenOverBy : void 0;
+}
+function readLockFile(lockPath) {
+	try {
+		return parseLockInfo(JSON.parse(readFileSync(lockPath, "utf-8")));
+	} catch {
+		return;
+	}
+}
+const LOCK_COMMANDS = /* @__PURE__ */ new Set([
+	"dev",
+	"build",
+	"analyze",
+	"preview"
+]);
+const MAX_LOCK_STRING_LENGTH = 1024;
+const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F-\u009F]/g;
+const LOCK_HOSTNAME_RE = /^[\w.:[\]-]{1,253}$/;
+function lockPid(value) {
+	return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 2 ** 31 - 1 ? value : void 0;
+}
+function lockText(value) {
+	return typeof value === "string" ? value.slice(0, MAX_LOCK_STRING_LENGTH).replace(CONTROL_CHARS_RE, "") : void 0;
+}
+function lockURL(value) {
+	const text = lockText(value);
+	if (!text) return;
+	try {
+		const url = new URL(text);
+		return url.protocol === "http:" || url.protocol === "https:" ? text : void 0;
+	} catch {
+		return;
+	}
+}
+/**
+* Validate a parsed `nuxt.lock` document.
+*
+* A lock lives in the build directory, so it can arrive with a cloned project
+* and is read before any of that project's code runs. Everything taken from it
+* is either signalled, connected to, or printed, so a record that does not have
+* the exact shape written by {@link acquireLock} is discarded rather than
+* repaired.
+*/
+function parseLockInfo(raw) {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+	const input = raw;
+	const pid = lockPid(input.pid);
+	const command = input.command;
+	const startedAt = input.startedAt;
+	if (!pid || !LOCK_COMMANDS.has(command) || typeof startedAt !== "number" || !Number.isFinite(startedAt)) return;
+	if (startedAt > Date.now() + MAX_LOCK_CLOCK_SKEW_MS) return;
+	const port = input.port;
+	const hostname = lockText(input.hostname);
+	const parentPid = lockPid(input.parentPid);
+	const serverPid = lockPid(input.serverPid);
+	const takenOverBy = lockPid(input.takenOverBy);
+	return {
+		pid,
+		startedAt,
+		command,
+		cwd: lockText(input.cwd) ?? "",
+		interactive: input.interactive === true,
+		...typeof port === "number" && Number.isInteger(port) && port > 0 && port <= 65535 ? { port } : {},
+		...hostname && LOCK_HOSTNAME_RE.test(hostname) ? { hostname } : {},
+		...lockURL(input.url) ? { url: lockURL(input.url) } : {},
+		...parentPid ? { parentPid } : {},
+		...serverPid ? { serverPid } : {},
+		...takenOverBy ? { takenOverBy } : {}
+	};
+}
+/**
+* Replace a lock we own. Writing a sibling temp file and renaming it into place
+* keeps the window where a reader could see a truncated file from existing: a
+* partial read looks like a corrupted lock, which another process would treat as
+* stale and claim.
+*/
+function writeLockFile(lockPath, info) {
+	const tmpPath = `${lockPath}.${process.pid}.tmp`;
+	try {
+		writeFileSync(tmpPath, JSON.stringify(info, null, 2));
+		renameSync(tmpPath, lockPath);
+	} catch {
+		tryUnlink(tmpPath);
+	}
+}
+function tryUnlink(lockPath) {
+	try {
+		unlinkSync(lockPath);
+	} catch {}
+}
+function isLockActive(info) {
+	return info.pid !== process.pid && Date.now() - info.startedAt <= MAX_LOCK_AGE_MS && isProcessAlive(info.pid);
+}
+/**
+* Locking is always enabled: `dev` and `build` share one build directory, and
+* two processes writing it corrupt each other's output. `NUXT_IGNORE_LOCK=1`
+* and `NUXT_LOCK=0` opt out.
+*/
+function isLockEnabled() {
+	const { NUXT_IGNORE_LOCK: ignore, NUXT_LOCK: lock } = process.env;
+	return (!ignore || ignore === "0" || ignore === "false") && lock !== "0" && lock !== "false";
+}
+/**
+* Atomically acquire a build/dev lock.
+* Returns `{ existing }` if another live process holds the lock, otherwise
+* `{ release }` to be invoked on shutdown. No-op when locking is disabled.
+*/
+function acquireLock(buildDir, info, options = {}) {
+	return acquireLockAt(lockPathFor(buildDir), buildDir, info, options);
+}
+/**
+* Claim the build output directory for the duration of a build.
+*
+* Two builds of one project can resolve different build directories, because
+* `loadNuxtConfig` moves a production build out of `.nuxt` when that already
+* exists, yet they still write the same output. The marker is keyed by output
+* path so unrelated outputs stay independent, and is kept outside the directory
+* it guards because the build empties that.
+*/
+function acquireOutputLock(rootDir, outputDir, info) {
+	const dir = join(rootDir, OUTPUT_LOCK_DIRNAME);
+	const key = createHash("sha256").update(outputDir).digest("hex").slice(0, 8);
+	return acquireLockAt(join(dir, `output-${key}.lock`), dir, info);
+}
+/** Kept apart from the build directory, which `nuxt preview` never writes to. */
+function previewLockDir(rootDir) {
+	return join(rootDir, OUTPUT_LOCK_DIRNAME, "preview");
+}
+function acquireLockAt(lockPath, dir, info, options = {}) {
+	if (!isLockEnabled()) return { release: () => {} };
+	const fullInfo = {
+		pid: process.pid,
+		startedAt: Date.now(),
+		interactive: isInteractiveSession(),
+		...info
+	};
+	try {
+		mkdirSync(dir, { recursive: true });
+	} catch {}
+	const blockingLock = () => {
+		const existing = readLockFile(lockPath);
+		return existing && existing.pid !== options.takeoverFrom && isLockActive(existing) ? existing : void 0;
+	};
+	for (let attempt = 0; attempt < 2; attempt++) try {
+		writeFileSync(lockPath, JSON.stringify(fullInfo, null, 2), { flag: "wx" });
+		return { release: makeRelease(lockPath) };
+	} catch (err) {
+		if (err.code !== "EEXIST") throw err;
+		const existing = blockingLock();
+		if (existing) return { existing };
+		tryUnlink(lockPath);
+	}
+	const existing = blockingLock();
+	return existing ? { existing } : { release: () => {} };
+}
+/**
+* Overwrite an existing lock we already own with updated metadata (e.g. port
+* information learned after the listener binds). Callers must hold the lock
+* via a prior successful `acquireLock`. Does nothing when locking is disabled.
+*/
+function updateLock(buildDir, info) {
+	if (!isLockEnabled()) return;
+	const current = readLock(buildDir);
+	if (current && current.pid !== process.pid) return;
+	const next = {
+		pid: process.pid,
+		startedAt: current?.startedAt ?? Date.now(),
+		interactive: isInteractiveSession(),
+		takenOverBy: current?.takenOverBy,
+		...info
+	};
+	writeLockFile(lockPathFor(buildDir), next);
+}
+function makeRelease(lockPath) {
+	let released = false;
+	function release() {
+		if (released) return;
+		released = true;
+		process.off("exit", release);
+		const current = readLockFile(lockPath);
+		if (!current || current.pid === process.pid) tryUnlink(lockPath);
+	}
+	process.on("exit", release);
+	return release;
+}
+/**
+* Format an error message when a Nuxt process holds a lock this one needs.
+* Designed to be actionable for both humans and LLM agents.
+*
+* `outputDir` names the build output being contended, when the lock is over one
+* rather than over the project itself.
+*/
+function formatLockError(info, options = {}) {
+	const killCmd = process.platform === "win32" ? `taskkill /PID ${info.pid} /F` : `kill ${info.pid}`;
+	const label = info.command === "dev" ? "dev server" : "build";
+	const lines = [
+		"",
+		options.outputDir ? `Another Nuxt ${label} is already writing to ${options.outputDir}:` : `Another Nuxt ${label} is already running:`,
+		""
+	];
+	if (info.url) lines.push(`  URL:     ${info.url}`);
+	lines.push(`  PID:     ${info.pid}`);
+	lines.push(`  Dir:     ${info.cwd}`);
+	lines.push(`  Started: ${new Date(info.startedAt).toLocaleString()}`);
+	lines.push("");
+	if (info.command === "dev" && info.url) lines.push(`Run \`${killCmd}\` to stop it, or connect to ${info.url}`);
+	else lines.push(`Run \`${killCmd}\` to stop it.`);
+	lines.push(`Set NUXT_IGNORE_LOCK=1 to bypass this check.`);
+	lines.push("");
+	return lines.join("\n");
+}
+//#endregion
+export { formatLockError as a, isProcessAlive as c, readActiveLock as d, readLock as f, clearTakeover as i, markTakenOver as l, acquireOutputLock as n, getTakeoverPid as o, updateLock as p, clearStaleLock as r, isLockEnabled as s, acquireLock as t, previewLockDir as u };

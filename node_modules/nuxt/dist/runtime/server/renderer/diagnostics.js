@@ -1,0 +1,54 @@
+import { createConsoleReporter, defineDiagnostics } from "nostics";
+import { ansiFormatter } from "nostics/formatters/ansi";
+//#region src/runtime/server/renderer/diagnostics.ts
+const ansi = (open, close) => (s) => `\x1B[${open}m${s}\x1B[${close}m`;
+const colors = {
+	red: ansi(31, 39),
+	yellow: ansi(33, 39),
+	cyan: ansi(36, 39),
+	gray: ansi(90, 39),
+	bold: ansi(1, 22),
+	dim: ansi(2, 22)
+};
+/**
+* E8xxx
+* SSR rendering diagnostics, sharing the range with the server runtime that
+* hosts the renderer.
+*/
+const docsBase = (code) => `https://nuxt.com/docs/4.x/errors/${code.replace("NUXT_", "").toLowerCase()}`;
+const rendererDiagnostics = /* #__PURE__ */ defineDiagnostics({
+	docsBase,
+	reporters: [/* @__PURE__ */ createConsoleReporter(import.meta.dev && process.env.NODE_ENV !== "test" ? { formatter: ansiFormatter(colors) } : void 0)],
+	codes: {
+		NUXT_E8001: {
+			why: (p) => `\`render:html\` mutated \`body\`/\`bodyAppend\` while streaming (\`${p.path}\`). These fields are silently dropped because the body is about to stream.`,
+			fix: "Use the `render:html:close` hook instead.",
+			docs: false
+		},
+		NUXT_E8002: {
+			why: (p) => `SSR streaming committed the response before render completed (\`${p.path}\`). The following mutations did not reach the client and were dropped:\n  - ${p.mutations}`,
+			fix: (p) => `Move the mutation into a plugin (which runs before the shell is flushed), or opt this route out of streaming with \`routeRules: { '${p.path}': { streaming: false } }\` or the \`render:route\` hook.`,
+			docs: false
+		},
+		NUXT_E8004: {
+			why: "The server bundle is not available.",
+			fix: "Ensure the Nuxt build completed successfully and the server entry was emitted by your builder.",
+			docs: false
+		},
+		NUXT_E8006: {
+			why: (p) => `The payload for \`${p.path}\` is ${p.size}, which will increase the page size and slow down hydration.${p.keys ? ` Largest payload keys:\n  - ${p.keys}` : ""}`,
+			fix: "Use the `pick` or `transform` options of `useAsyncData`/`useFetch` to strip out data the client does not need.",
+			docs: false
+		},
+		NUXT_E8007: {
+			why: (p) => `\`${p.path}\` relies on client-side JavaScript, but \`features.noScripts: 'production'\` will strip scripts from this route in production:\n  - ${p.reasons}`,
+			fix: "Remove the client-side dependency from this route, or scope script stripping with the `noScripts` route rule instead of enabling it globally."
+		},
+		NUXT_E8009: {
+			why: (p) => `A page error interrupted the stream for \`${p.path}\`, and ${p.what} also failed while rendering the error response.\n  ${p.cause}`,
+			fix: "Fix the page error first. If it keeps happening, report the failure below - the browser will show a blank or partial page instead of the error page."
+		}
+	}
+});
+//#endregion
+export { rendererDiagnostics };

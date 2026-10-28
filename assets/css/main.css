@@ -1,0 +1,92 @@
+html{background:#05060a;color:#fff}
+body{background:transparent!important}
+body{font-family:'Space Grotesk',sans-serif;overflow-x:hidden}
+@media (pointer:fine){body,a,button{cursor:none}}
+.cur-dot,.cur-ring{position:fixed;left:0;top:0;pointer-events:none;z-index:9999;border-radius:50%;will-change:transform}
+.cur-dot{width:8px;height:8px;background:#ff6a1a;margin:-4px 0 0 -4px}
+.cur-ring{width:44px;height:44px;margin:-22px 0 0 -22px;border:1.5px solid #ff6a1a;display:grid;place-items:center;font-size:10px;letter-spacing:.15em;transition:width .25s,height .25s,margin .25s,background .25s}
+.cur-ring span{opacity:0;transition:opacity .2s}
+body.hov .cur-ring{width:84px;height:84px;margin:-42px 0 0 -42px;background:rgba(255,106,26,.18)}
+body.hov .cur-ring span{opacity:1}
+body.hov .cur-dot{opacity:0}
+.planet{background:radial-gradient(circle at 30% 30%,#ffb067,#d9560f 35%,#4a1a06 70%,#120600);box-shadow:0 0 120px 20px rgba(255,106,26,.35),inset -40px -30px 80px #000}
+.planet::after{content:'';position:absolute;inset:0;border-radius:50%;background:repeating-linear-gradient(100deg,transparent 0 28px,rgba(0,0,0,.18) 28px 40px);background-size:200% 100%;animation:pl 40s linear infinite}
+@keyframes pl{to{background-position:200% 0}}
+.reveal{opacity:0;transform:translateY(60px);transition:all .9s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+.glass{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(10px)}
+.btn-gh{position:relative;overflow:hidden;isolation:isolate}
+.btn-gh::before{content:'';position:absolute;inset:-60%;background:conic-gradient(from 0deg,transparent 60%,#ff6a1a);animation:sp 2.5s linear infinite;opacity:0;transition:.3s;z-index:-2}
+.btn-gh::after{content:'';position:absolute;inset:2px;border-radius:inherit;background:#0a0b10;z-index:-1}
+.btn-gh:hover::before{opacity:1}
+.btn-gh:hover svg{animation:wob .7s ease}
+@keyframes sp{to{transform:rotate(360deg)}}
+@keyframes wob{25%{transform:rotate(-20deg) scale(1.2)}60%{transform:rotate(15deg) scale(1.2)}}
+.btn-li{position:relative;overflow:hidden;isolation:isolate}
+.btn-li::before{content:'';position:absolute;inset:0;background:#0a66c2;transform:translateY(101%);transition:transform .4s;z-index:-1}
+.btn-li:hover::before{transform:none}
+.btn-li::after{content:'';position:absolute;top:0;left:-80%;width:50%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-20deg)}
+.btn-li:hover::after{left:140%;transition:left .7s}
+.btn-li:hover svg{animation:pop .5s ease}
+@keyframes pop{50%{transform:scale(1.4) rotate(-8deg)}}
+
+/* Saturn */
+.saturn{position:relative;aspect-ratio:1;transform:rotate(-20deg);animation:flt 9s ease-in-out infinite}
+@keyframes flt{50%{translate:0 -14px}}
+.saturn .body{position:absolute;inset:22%;border-radius:50%;z-index:1;overflow:hidden;
+ background:repeating-linear-gradient(180deg,#f6c98a 0 7%,#d9985a 7% 13%,#f0b878 13% 21%,#b9763f 21% 26%,#ffd9a3 26% 34%);
+ box-shadow:inset -22px -18px 40px rgba(0,0,0,.75),0 0 70px rgba(255,150,60,.35)}
+.saturn .ring{position:absolute;left:-6%;right:-6%;top:39%;bottom:39%;border-radius:50%;
+ background:radial-gradient(ellipse at center,transparent 52%,rgba(255,200,140,.85) 53% 60%,transparent 61% 64%,rgba(255,160,90,.7) 65% 78%,transparent 79% 81%,rgba(255,220,180,.45) 82% 90%,transparent 91%);
+ filter:drop-shadow(0 0 12px rgba(255,140,50,.5))}
+.saturn .ring.back{z-index:0}
+.saturn .ring.front{z-index:2;clip-path:inset(50% 0 0 0)}
+/* patterns */
+.pat-grid{background-image:radial-gradient(rgba(255,150,70,.55) 1px,transparent 1.5px),linear-gradient(rgba(255,120,40,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,120,40,.07) 1px,transparent 1px);background-size:34px 34px,68px 68px,68px 68px;
+ -webkit-mask-image:radial-gradient(ellipse 60% 60% at 50% 50%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse 60% 60% at 50% 50%,#000 20%,transparent 75%);animation:gd 30s linear infinite}
+@keyframes gd{to{background-position:34px 34px,68px 68px,68px 68px}}
+.pat-rings{width:96vmin;height:96vmin}
+.pat-rings i{position:absolute;border-radius:50%;inset:0;border:1px dashed rgba(255,140,60,.4);animation:sp 60s linear infinite}
+.pat-rings .r2{inset:9%;border-style:dotted;border-color:rgba(255,190,120,.5);animation-direction:reverse;animation-duration:45s}
+.pat-rings .r3{inset:19%;border:1px solid rgba(255,120,40,.25);animation-duration:80s}
+.pat-rings .r4{inset:29%;border:2px dotted rgba(255,200,150,.35);animation-duration:35s}
+.pat-rings b{position:absolute;width:10px;height:10px;border-radius:50%;background:#ff8a3c;box-shadow:0 0 16px 4px rgba(255,120,40,.8)}
+.pat-rings .d1{left:50%;top:-5px;animation:o1 14s linear infinite}
+.pat-rings .d2{right:4%;top:22%;width:7px;height:7px;background:#ffd2a8}
+.pat-rings .d3{left:8%;bottom:20%;width:6px;height:6px}
+@keyframes o1{50%{translate:30vmin 30vmin}}
+
+/* floating stars */
+.star-layer{position:fixed;left:0;top:0;width:100%;height:200vh;z-index:-5;pointer-events:none;will-change:transform}
+.fstar{position:absolute;border-radius:50%;background:currentColor;box-shadow:0 0 8px 1px var(--c);animation:tw var(--tw) ease-in-out var(--dly) infinite,fl var(--fl) ease-in-out var(--dly) infinite}
+.fstar.glyph{background:none;box-shadow:none;width:auto!important;height:auto!important;line-height:1;text-shadow:0 0 14px var(--c);animation:tw var(--tw) ease-in-out var(--dly) infinite,fl var(--fl) ease-in-out var(--dly) infinite,sp 14s linear infinite}
+@keyframes tw{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes fl{0%,100%{translate:0 0}33%{translate:14px -22px}66%{translate:-12px -10px}}
+/* entrance for every element */
+@keyframes f-rise{from{opacity:0;translate:0 40px;filter:blur(8px)}}
+@keyframes f-left{from{opacity:0;translate:-60px 0;filter:blur(6px)}}
+@keyframes f-right{from{opacity:0;translate:60px 0;filter:blur(6px)}}
+@keyframes f-zoom{from{opacity:0;scale:.6;filter:blur(8px)}}
+@keyframes f-flip{from{opacity:0;rotate:-8deg;translate:0 30px;filter:blur(5px)}}
+.fx-pre{opacity:0}
+.fx{animation:var(--fx) .9s cubic-bezier(.2,.7,.2,1) var(--dl,0s) both}
+/* idle micro-animations */
+@keyframes bob{50%{translate:0 -6px}}
+@keyframes nudge{50%{translate:4px -4px}}
+@keyframes shine{to{background-position:200% 0}}
+@keyframes glow{50%{filter:drop-shadow(0 0 95px rgba(255,120,30,.85))}}
+@keyframes kenb{to{scale:1.12}}
+@keyframes dash{from{scale:.3 1}}
+.breathe{animation:glow 5s ease-in-out infinite}
+.kb{animation:kenb 10s ease-in-out infinite alternate}
+.skill-icon{display:inline-block;animation:bob 3.2s ease-in-out infinite}
+.skill-tile:nth-child(odd) .skill-icon{animation-delay:-1.6s}
+.heading-star,.linked-icon{display:inline-block;animation:sp 8s linear infinite}
+.brand-orbit{animation:sp 12s linear infinite}
+.chapter-dash{transform-origin:left;animation:dash 3s ease-in-out infinite alternate}
+.btn span,.text-link span,.contact-arrow,.project-link span,.skill-tile-corner{display:inline-block;animation:nudge 1.8s ease-in-out infinite}
+.warm-text,.contact-amazing,.gradient-word{background:linear-gradient(90deg,#ff893b,#ffe0bd,#ff5c22,#ff893b);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shine 4s linear infinite}
+.text-accent{text-shadow:0 0 18px rgba(255,106,26,.35)}
+a,button,.glass,.skill-tile,.contact-card,.quote-card{transition:translate .3s,box-shadow .3s,border-color .3s,background .3s,filter .3s}
+a:hover,.skill-tile:hover,.contact-card:hover,.glass:hover{translate:0 -4px}
+.glass:hover,.skill-tile:hover,.contact-card:hover{box-shadow:0 10px 40px rgba(255,106,26,.25);border-color:rgba(255,140,60,.55)}

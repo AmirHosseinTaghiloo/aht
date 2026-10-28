@@ -1,0 +1,123 @@
+export type Num = {
+    type: 'Num';
+    value: number;
+};
+export type Dim = {
+    type: 'Dim';
+    value: number;
+    unit: string;
+    rawUnit?: string;
+};
+export type Ident = {
+    type: 'Ident';
+    name: string;
+    rawName?: string;
+};
+export type Call = {
+    type: 'Call';
+    name: string;
+    args: Node[];
+    rawName?: string;
+};
+export type OpaqueComponent = string | Node | OpaqueComponent[];
+export type OpaqueCall = {
+    type: 'OpaqueCall';
+    name: string;
+    components: OpaqueComponent[];
+    rawName?: string;
+};
+export type SumTerm = {
+    sign: 1 | -1;
+    node: Node;
+};
+export type Sum = {
+    type: 'Sum';
+    terms: SumTerm[];
+    grouped?: boolean;
+};
+export type ProductFactor = {
+    exponent: 1 | -1;
+    node: Node;
+};
+export type Product = {
+    type: 'Product';
+    factors: ProductFactor[];
+    grouped?: boolean;
+};
+export type Node = Num | Dim | Ident | Call | OpaqueCall | Sum | Product;
+/**
+ * @typedef {{type: 'Num', value: number}} Num
+ * @typedef {{type: 'Dim', value: number, unit: string, rawUnit?: string}} Dim
+ * @typedef {{type: 'Ident', name: string, rawName?: string}} Ident
+ * @typedef {{type: 'Call', name: string, args: Node[], rawName?: string}} Call
+ * @typedef {string | Node | OpaqueComponent[]} OpaqueComponent
+ * @typedef {{type: 'OpaqueCall', name: string, components: OpaqueComponent[], rawName?: string}} OpaqueCall
+ * @typedef {{sign: 1 | -1, node: Node}} SumTerm Sign is always +1 when node is Num or Dim.
+ * @typedef {{type: 'Sum', terms: SumTerm[], grouped?: boolean}} Sum
+ * @typedef {{exponent: 1 | -1, node: Node}} ProductFactor exponent +1 = numerator, -1 = denominator.
+ * @typedef {{type: 'Product', factors: ProductFactor[], grouped?: boolean}} Product
+ * @typedef {Num | Dim | Ident | Call | OpaqueCall | Sum | Product} Node
+ */
+/**
+ * @param {number} value
+ * @return {Num}
+ */
+declare function num(value: number): Num;
+/**
+ * @param {number} value
+ * @param {string} unit
+ * @param {string} [rawUnit]
+ * @return {Dim}
+ */
+declare function dim(value: number, unit: string, rawUnit?: string): Dim;
+/**
+ * @param {string} name
+ * @param {string} [rawName]
+ * @return {Ident}
+ */
+declare function ident(name: string, rawName?: string): Ident;
+/**
+ * @param {string} name
+ * @param {Node[]} args
+ * @param {string} [rawName]
+ * @return {Call}
+ */
+declare function call(name: string, args: Node[], rawName?: string): Call;
+/**
+ * @param {string} name
+ * @param {OpaqueComponent[]} components
+ * @param {string} [rawName]
+ * @return {OpaqueCall}
+ */
+declare function opaqueCall(name: string, components: OpaqueComponent[], rawName?: string): OpaqueCall;
+/**
+ * @param {SumTerm[]} rawTerms
+ * @return {Node}
+ */
+declare function mkSum(rawTerms: SumTerm[]): Node;
+/**
+ * @param {ProductFactor[]} rawFactors
+ * @return {Node}
+ */
+declare function mkProduct(rawFactors: ProductFactor[]): Node;
+/**
+ * Mark a node as a source parenthesized group. A Sum or Product keeps its
+ * structure; any other node becomes a single-factor grouped Product.
+ * @param {Node} node
+ * @return {Node}
+ */
+declare function mkGroup(node: Node): Node;
+/**
+ * Group a parenthesized expression when its tokens must stay bound: a sum, or
+ * a product around a substitution function.
+ * @param {Node} node
+ * @return {Node}
+ */
+declare function groupSubstitution(node: Node): Node;
+/**
+ * Negate any node, preserving canonical form.
+ * @param {Node} node
+ * @return {Node}
+ */
+declare function negate(node: Node): Node;
+export { num, dim, ident, call, opaqueCall, mkSum, mkProduct, mkGroup, groupSubstitution, negate, };

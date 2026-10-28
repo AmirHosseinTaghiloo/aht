@@ -1,0 +1,200 @@
+import { EventHandler, H3Event } from "h3";
+import { Nitro, NitroConfig, NitroDevEventHandler, NitroEventHandler, NitroOptions, NitroRouteConfig, NitroRouteRules, NitroRuntimeConfig } from "nitropack/types";
+import { DevServerLog, NuxtIslandContext, NuxtIslandResponse, NuxtRenderChunkContext, NuxtRenderCloseContext, NuxtRenderHTMLContext, NuxtRenderRouteContext } from "#app/types";
+import { NuxtRequestContext, NuxtRequestContext as NuxtRequestContext$1, RouteRuleConfigExtensions, RuntimeConfig, RuntimeConfigApp, TracingChannelOptions } from "nuxt/schema";
+//#region src/augments.d.ts
+/** The channels this package's runtime forwards, alongside the Nuxt-owned ones. */
+interface NitroTracingChannels {
+  srvx?: boolean;
+  h3?: boolean;
+  unstorage?: boolean;
+}
+/**
+ * Per-channel toggles for `tracingChannel`: the channels this runtime forwards, plus the
+ * Nuxt-owned channels.
+ *
+ * @experimental Channel names, payload shapes, and option keys may change.
+ */
+export type NuxtTracingChannelOptions = TracingChannelOptions;
+/**
+ * Dev-only access to the SSR bundle's transformed modules, registered by the bundler that
+ * evaluates them in the Nitro process.
+ *
+ * @experimental
+ */
+export interface SSRSourceMaps {
+  /** Transformed code of an SSR module as it was evaluated. */
+  getCode: (file: string) => string | undefined;
+  /** Position in generated code a source position was mapped from. */
+  getCompiledPosition?: (file: string, line: number, column?: number) => {
+    file: string;
+    line: number;
+    column: number;
+  } | undefined;
+}
+declare global {
+  interface ImportMeta {
+    dev: boolean;
+    test: boolean;
+  }
+}
+declare module "nitropack" {
+  interface NitroRouteRules {
+    ssr?: boolean;
+    streaming?: boolean;
+    noScripts?: boolean;
+    /** @deprecated Use `noScripts` instead */
+    experimentalNoScripts?: boolean;
+    appMiddleware?: Record<string, boolean>;
+  }
+  interface NitroConfig {
+    tracingChannel?: boolean | NuxtTracingChannelOptions;
+  }
+}
+declare module "nitropack/types" {
+  interface NitroRouteRules {
+    ssr?: boolean;
+    streaming?: boolean;
+    noScripts?: boolean;
+    /** @deprecated Use `noScripts` instead */
+    experimentalNoScripts?: boolean;
+    appMiddleware?: Record<string, boolean>;
+  }
+  interface NitroConfig {
+    tracingChannel?: boolean | NuxtTracingChannelOptions;
+  }
+}
+declare module "nitropack" {
+  interface NitroApp {
+    /**
+     * Only set in development, by bundlers that evaluate the SSR bundle within
+     * the Nitro process.
+     *
+     * @experimental
+     */
+    ssrSourceMaps?: SSRSourceMaps;
+  }
+  interface NitroRuntimeConfig extends RuntimeConfig {}
+  interface NitroRuntimeConfigApp extends RuntimeConfigApp {}
+  interface NitroRouteConfig extends RouteRuleConfigExtensions {}
+  interface NitroRouteConfig {
+    ssr?: boolean;
+    streaming?: boolean;
+    noScripts?: boolean;
+    /** @deprecated Use `noScripts` instead */
+    experimentalNoScripts?: boolean;
+  }
+  interface NitroRuntimeHooks {
+    "dev:ssr-logs": (ctx: {
+      logs: DevServerLog[];
+      path: string;
+    }) => void | Promise<void>;
+    "render:html": (htmlContext: NuxtRenderHTMLContext, context: {
+      event: H3Event;
+      streaming?: boolean;
+    }) => void | Promise<void>;
+    "render:html:chunk": (chunkContext: NuxtRenderChunkContext, context: {
+      event: H3Event;
+    }) => void | Promise<void>;
+    "render:html:close": (closeContext: NuxtRenderCloseContext, context: {
+      event: H3Event;
+    }) => void | Promise<void>;
+    "render:route": (renderRouteContext: NuxtRenderRouteContext, context: {
+      event: H3Event;
+    }) => void | Promise<void>;
+    "render:island": (islandResponse: NuxtIslandResponse, context: {
+      event: H3Event;
+      islandContext: NuxtIslandContext;
+    }) => void | Promise<void>;
+  }
+}
+declare module "nitropack/types" {
+  interface NitroApp {
+    /**
+     * Only set in development, by bundlers that evaluate the SSR bundle within
+     * the Nitro process.
+     *
+     * @experimental
+     */
+    ssrSourceMaps?: SSRSourceMaps;
+  }
+  interface NitroRuntimeConfig extends RuntimeConfig {}
+  interface NitroRuntimeConfigApp extends RuntimeConfigApp {}
+  interface NitroRouteConfig extends RouteRuleConfigExtensions {}
+  interface NitroRouteConfig {
+    ssr?: boolean;
+    streaming?: boolean;
+    noScripts?: boolean;
+    /** @deprecated Use `noScripts` instead */
+    experimentalNoScripts?: boolean;
+  }
+  interface NitroRuntimeHooks {
+    "dev:ssr-logs": (ctx: {
+      logs: DevServerLog[];
+      path: string;
+    }) => void | Promise<void>;
+    "render:html": (htmlContext: NuxtRenderHTMLContext, context: {
+      event: H3Event;
+      streaming?: boolean;
+    }) => void | Promise<void>;
+    "render:html:chunk": (chunkContext: NuxtRenderChunkContext, context: {
+      event: H3Event;
+    }) => void | Promise<void>;
+    "render:html:close": (closeContext: NuxtRenderCloseContext, context: {
+      event: H3Event;
+    }) => void | Promise<void>;
+    "render:route": (renderRouteContext: NuxtRenderRouteContext, context: {
+      event: H3Event;
+    }) => void | Promise<void>;
+    "render:island": (islandResponse: NuxtIslandResponse, context: {
+      event: H3Event;
+      islandContext: NuxtIslandContext;
+    }) => void | Promise<void>;
+  }
+}
+/** The types this package contributes to Nuxt's build-time registry. */
+interface NitroSchemaTypes {
+  instance: Nitro;
+  config: NitroConfig;
+  handler: NitroEventHandler;
+  devHandler: NitroDevEventHandler;
+  routeRuleConfig: NitroRouteConfig;
+  tracingChannels: NitroTracingChannels;
+}
+/** The types this package's runtime contributes to the app layer. */
+interface NitroServerTypes {
+  event: H3Event;
+  eventHandler: EventHandler;
+  routeRules: NitroRouteRules;
+}
+declare module "@nuxt/schema" {
+  interface NitroTypes extends NitroSchemaTypes {}
+  interface ServerTypes extends NitroServerTypes {}
+  interface RuntimeConfig {
+    /** Only available on the server. */
+    nitro?: NitroRuntimeConfig["nitro"];
+  }
+  interface NuxtDebugOptions {
+    /** Debug options for Nitro */
+    nitro?: NitroOptions["debug"];
+  }
+}
+declare module "nuxt/schema" {
+  interface NitroTypes extends NitroSchemaTypes {}
+  interface ServerTypes extends NitroServerTypes {}
+  interface RuntimeConfig {
+    /** Only available on the server. */
+    nitro?: NitroRuntimeConfig["nitro"];
+  }
+  interface NuxtDebugOptions {
+    /** Debug options for Nitro */
+    nitro?: NitroOptions["debug"];
+  }
+}
+declare module "h3" {
+  interface H3EventContext {
+    nuxt?: NuxtRequestContext$1;
+  }
+}
+//#endregion
+export type { NuxtRequestContext };

@@ -1,0 +1,293 @@
+// Canonical AST. N-ary Sum and Product with signed numeric leaves.
+// Invariants enforced by the constructors below:
+//
+//   - Num/Dim values may be any finite number (negatives allowed); a `-5`
+//     is `Num(-5)`, never `Sum([{sign:-1, Num(5)}])`. One form per value.
+//   - In a SumTerm with Num/Dim node, sign is always +1; the sign slot is
+//     reserved for opaque nodes (Ident, Call, Product, multi-term Sum).
+//   - No ungrouped Sum directly contains another Sum (flattened on
+//     construction). A grouped Sum is retained so a later negative sign
+//     cannot be distributed across opaque terms.
+//   - No Product directly contains another ungrouped Product (flattened). A
+//     grouped Product is retained: it is a parenthesized group around a
+//     substitution function (`var()`, `env()`, ...), whose tokens must not
+//     merge with the surrounding factors. A grouped Product may hold a single
+//     factor.
+//   - A Sum/Product with one positive element collapses to that element.
+//   - A Sum/Product with no elements collapses to Num(0) / Num(1).
+//   - Positive zero-valued Nums are dropped from all-number sums. They are
+//     retained in mixed or unresolved sums because they constrain the other
+//     terms to <number>. Negative zero is retained until calculation
+//     evaluation has finished, because it is an IEEE-754 value with observable
+//     math-function behavior.
+//     Zero-valued Dims are kept — the unit carries type info.
+
+/**
+ * @typedef {{type: 'Num', value: number}} Num
+ * @typedef {{type: 'Dim', value: number, unit: string, rawUnit?: string}} Dim
+ * @typedef {{type: 'Ident', name: string, rawName?: string}} Ident
+ * @typedef {{type: 'Call', name: string, args: Node[], rawName?: string}} Call
+ * @typedef {string | Node | OpaqueComponent[]} OpaqueComponent
+ * @typedef {{type: 'OpaqueCall', name: string, components: OpaqueComponent[], rawName?: string}} OpaqueCall
+ * @typedef {{sign: 1 | -1, node: Node}} SumTerm Sign is always +1 when node is Num or Dim.
+ * @typedef {{type: 'Sum', terms: SumTerm[], grouped?: boolean}} Sum
+ * @typedef {{exponent: 1 | -1, node: Node}} ProductFactor exponent +1 = numerator, -1 = denominator.
+ * @typedef {{type: 'Product', factors: ProductFactor[], grouped?: boolean}} Product
+ * @typedef {Num | Dim | Ident | Call | OpaqueCall | Sum | Product} Node
+ */
+
+/**
+ * @param {number} value
+ * @return {Num}
+ */
+function num(value) {
+  return { type: 'Num', value };
+}
+
+/**
+ * @param {number} value
+ * @param {string} unit
+ * @param {string} [rawUnit]
+ * @return {Dim}
+ */
+function dim(value, unit, rawUnit) {
+  return rawUnit === undefined
+    ? { type: 'Dim', value, unit }
+    : { type: 'Dim', value, unit, rawUnit };
+}
+
+/**
+ * @param {string} name
+ * @param {string} [rawName]
+ * @return {Ident}
+ */
+function ident(name, rawName) {
+  return rawName === undefined
+    ? { type: 'Ident', name }
+    : { type: 'Ident', name, rawName };
+}
+
+/**
+ * @param {string} name
+ * @param {Node[]} args
+ * @param {string} [rawName]
+ * @return {Call}
+ */
+function call(name, args, rawName) {
+  return rawName === undefined
+    ? { type: 'Call', name, args }
+    : { type: 'Call', name, args, rawName };
+}
+
+/**
+ * @param {string} name
+ * @param {OpaqueComponent[]} components
+ * @param {string} [rawName]
+ * @return {OpaqueCall}
+ */
+function opaqueCall(name, components, rawName) {
+  return rawName === undefined
+    ? { type: 'OpaqueCall', name, components }
+    : { type: 'OpaqueCall', name, components, rawName };
+}
+
+/**
+ * @param {SumTerm[]} rawTerms
+ * @return {Node}
+ */
+function mkSum(rawTerms) {
+  /** @type {SumTerm[]} */
+  const flat = [];
+  let hasNegativeZero = false;
+  for (const t of rawTerms) {
+    if (pushSumTerm(flat, t)) hasNegativeZero = true;
+  }
+  const zeroIsTypeAnchor = flat.some((term) => term.node.type !== 'Num');
+  // `+0 + -0` evaluates to +0. Keep positive zero terms when the sum also
+  // contains -0 so simplification can perform that IEEE-754 operation before
+  // the canonical zero-elision below.
+  let length = 0;
+  for (let i = 0; i < flat.length; i++) {
+    const term = flat[i];
+    if (
+      !hasNegativeZero &&
+      !zeroIsTypeAnchor &&
+      term.node.type === 'Num' &&
+      term.node.value === 0
+    ) {
+      continue;
+    }
+    flat[length++] = term;
+  }
+  flat.length = length;
+  if (length === 0) {
+    return num(0);
+  }
+  if (length === 1 && flat[0].sign === 1) {
+    return flat[0].node;
+  }
+  return { type: 'Sum', terms: flat };
+}
+
+/**
+ * @param {SumTerm[]} out
+ * @param {SumTerm} term
+ * @return {boolean} Whether the appended terms contain negative zero.
+ */
+function pushSumTerm(out, term) {
+  let { sign, node } = term;
+
+  if (node.type === 'Sum' && !node.grouped) {
+    let hasNegativeZero = false;
+    for (const inner of node.terms) {
+      if (
+        pushSumTerm(out, {
+          sign: /** @type {1 | -1} */ (sign * inner.sign),
+          node: inner.node,
+        })
+      ) {
+        hasNegativeZero = true;
+      }
+    }
+    return hasNegativeZero;
+  }
+
+  // sign=-1 around a Num/Dim leaf collapses into the value's sign — the
+  // canonical-form rule downstream code relies on.
+  if (sign === -1 && (node.type === 'Num' || node.type === 'Dim')) {
+    node = negate(node);
+    sign = 1;
+  }
+
+  out.push({ sign, node });
+  return node.type === 'Num' && Object.is(node.value, -0);
+}
+
+/**
+ * @param {ProductFactor[]} rawFactors
+ * @return {Node}
+ */
+function mkProduct(rawFactors) {
+  /** @type {ProductFactor[]} */
+  const flat = [];
+  for (const f of rawFactors) {
+    pushProductFactor(flat, f);
+  }
+  if (flat.length === 0) {
+    return num(1);
+  }
+  if (flat.length === 1 && flat[0].exponent === 1) {
+    return flat[0].node;
+  }
+  return { type: 'Product', factors: flat };
+}
+
+/**
+ * @param {ProductFactor[]} out
+ * @param {ProductFactor} f
+ * @return {void}
+ */
+function pushProductFactor(out, f) {
+  const n = f.node;
+  if (n.type === 'Product' && !n.grouped) {
+    for (const inner of n.factors) {
+      out.push({
+        exponent: /** @type {1 | -1} */ (f.exponent * inner.exponent),
+        node: inner.node,
+      });
+    }
+    return;
+  }
+  // Factor of 1 contributes nothing regardless of exponent (1/1 = 1).
+  if (n.type === 'Num' && n.value === 1) {
+    return;
+  }
+  out.push(f);
+}
+
+/**
+ * Mark a node as a source parenthesized group. A Sum or Product keeps its
+ * structure; any other node becomes a single-factor grouped Product.
+ * @param {Node} node
+ * @return {Node}
+ */
+function mkGroup(node) {
+  if (node.type === 'Sum' || node.type === 'Product') {
+    return { ...node, grouped: true };
+  }
+  return {
+    type: 'Product',
+    factors: [{ exponent: 1, node }],
+    grouped: true,
+  };
+}
+
+/**
+ * Whether a node is a substitution function call (`var()`, `env()`, ...), or
+ * an ungrouped Product that directly contains one. Nested groups are not
+ * inspected: they already bound their own tokens.
+ * @param {Node} node
+ * @return {boolean}
+ */
+function isSubstitutionNode(node) {
+  if (node.type === 'OpaqueCall') return true;
+  if (node.type === 'Product' && !node.grouped) {
+    return node.factors.some((factor) => isSubstitutionNode(factor.node));
+  }
+  return false;
+}
+
+/**
+ * Group a parenthesized expression when its tokens must stay bound: a sum, or
+ * a product around a substitution function.
+ * @param {Node} node
+ * @return {Node}
+ */
+function groupSubstitution(node) {
+  return node.type === 'Sum' || isSubstitutionNode(node) ? mkGroup(node) : node;
+}
+
+/**
+ * Negate any node, preserving canonical form.
+ * @param {Node} node
+ * @return {Node}
+ */
+function negate(node) {
+  if (node.type === 'Num') {
+    return num(-node.value);
+  }
+  if (node.type === 'Dim') {
+    return dim(-node.value, node.unit, node.rawUnit);
+  }
+  if (node.type === 'Sum') {
+    // A grouped sum may contain opaque terms whose meaning depends on the
+    // surrounding context. Keep the group intact so `-1 * (a + b)` cannot turn
+    // into `-a - b` while it is still unresolved.
+    if (node.grouped) {
+      return mkSum([{ sign: -1, node }]);
+    }
+    const result = mkSum(
+      node.terms.map((t) => ({
+        sign: /** @type {1 | -1} */ (-t.sign),
+        node: t.node,
+      }))
+    );
+    return result;
+  }
+  // Opaque (Ident, Call, OpaqueCall, Product): wrap as a single negative-sign term —
+  // the only case where sign=-1 remains on a SumTerm.
+  return mkSum([{ sign: -1, node }]);
+}
+
+export {
+  num,
+  dim,
+  ident,
+  call,
+  opaqueCall,
+  mkSum,
+  mkProduct,
+  mkGroup,
+  groupSubstitution,
+  negate,
+};

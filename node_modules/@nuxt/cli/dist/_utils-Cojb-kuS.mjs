@@ -1,0 +1,211 @@
+import { u as logger } from "./startup-clock-DXZlxuSA.mjs";
+import { i as logNetworkError } from "./path-env-D9Xd_BAN.mjs";
+import { i as resolveRootDir } from "./paths-DlXZaaIg.mjs";
+import { n as getNuxtConfig } from "./nuxt-config-zyufWWwx.mjs";
+import { a as toLoopback, i as resolveLockDir, n as findNitroDevWorker, r as noDevServerMessage, t as findDevServer } from "./dev-server-C7zAaNG-.mjs";
+import { t as highlight } from "./highlight-CNtoRxLK.mjs";
+import process from "node:process";
+import { styleText } from "node:util";
+import { join, resolve } from "pathe";
+import { readdirSync } from "node:fs";
+import http from "node:http";
+//#region src/commands/task/_utils.ts
+const TRAILING_SLASH_RE = /\/$/;
+const taskArgs = { url: {
+	type: "string",
+	description: "URL of the Nuxt server to talk to (default: the running dev server)",
+	valueHint: "url"
+} };
+/**
+* Resolve where the task routes live: an explicit `--url`, the dev server
+* recorded in the project's lock file, or the Nitro dev worker behind it.
+*
+* The worker is a fallback rather than the first choice because its address
+* comes from a file Nitro owns; the dev server's public URL is what this CLI
+* records itself.
+*/
+async function resolveTaskServer(args) {
+	if (args.url) {
+		if (!URL.canParse(args.url)) {
+			logger.error(`Invalid ${styleText("cyan", "--url")} value ${styleText("cyan", args.url)}.`);
+			process.exit(1);
+		}
+		return { base: args.url.replace(TRAILING_SLASH_RE, "") };
+	}
+	const cwd = resolveRootDir(args);
+	const buildDir = await resolveLockDir(cwd);
+	const server = await findDevServer(cwd, buildDir);
+	if (server) return { base: server.url };
+	const worker = await findNitroDevWorker(cwd, buildDir);
+	if (worker?.socketPath) return {
+		base: "http://localhost",
+		socketPath: worker.socketPath
+	};
+	if (worker?.url) return { base: toLoopback(worker.url) };
+	logger.error(noDevServerMessage("nuxt task"));
+	process.exit(1);
+}
+async function fetchTasks(server) {
+	return await request(server, "/_nitro/tasks");
+}
+/**
+* Ask the server to run a task.
+*
+* Nitro 2 exposes the dev task route for any method and reads the payload from
+* a `{ name, payload }` body; Nitro 3 also accepts that body, but earlier
+* prereleases registered the route for `GET` only and merged query parameters
+* into the payload. `POST` is tried first, falling back to a query-encoded
+* `GET` when the route rejects it.
+*/
+async function runTask(server, name, payload) {
+	const path = `/_nitro/tasks/${name.split("/").map(encodeURIComponent).join("/")}`;
+	const posted = await request(server, path, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({
+			name,
+			payload
+		})
+	});
+	if (posted.ok || posted.status !== 404 && posted.status !== 405) return posted;
+	const query = new URLSearchParams();
+	for (const [key, value] of Object.entries(payload)) query.set(key, typeof value === "string" ? value : JSON.stringify(value));
+	const queried = await request(server, `${path}${query.size > 0 ? `?${query}` : ""}`);
+	return queried.ok ? queried : posted;
+}
+/** Print the error a task route returned, with as much detail as it gave us. */
+function reportTaskError(response) {
+	const error = typeof response.data === "object" && response.data ? response.data : {};
+	const message = error.message || error.statusMessage || `Request failed with status ${response.status}`;
+	logger.error(message);
+	if (error.data !== void 0) process.stderr.write(`${format(error.data)}\n`);
+	if (response.status >= 500) {
+		const stack = (Array.isArray(error.stack) ? error.stack : (error.stack || "").split("\n")).map((line) => line.trim()).filter((line) => line.startsWith("at "));
+		if (stack.length > 0) process.stderr.write(styleText("dim", `${stack.map((line) => `  ${line}`).join("\n")}\n`));
+	}
+}
+/**
+* Advice for a server that answered but has no tasks to run.
+*
+* Nitro only scans the tasks directory when `nitro.experimental.tasks` is on,
+* so a project with the flag off is indistinguishable over HTTP from one that
+* has no tasks at all. Task files on disk are what tell the two apart.
+*/
+async function emptyTaskListHint(cwd) {
+	const enable = styleText("cyan", "nitro: { experimental: { tasks: true } }");
+	const dir = await resolveTasksDir(cwd);
+	const label = styleText("cyan", `${dir}/`);
+	return hasFiles(resolve(cwd, dir)) ? `Found task files in ${label} but the server reports none. Add ${enable} to your Nuxt config and restart the dev server.` : `Add a task in ${label} and enable tasks with ${enable} in your Nuxt config.`;
+}
+/** Advice for a server that does not expose the task routes at all. */
+function missingTaskRoutesHint() {
+	return `Nitro only serves its task routes in development, so this needs a running ${styleText("cyan", "nuxt dev")} server.`;
+}
+/**
+* Explain a task the server does not have. Only the task list can tell a
+* mistyped name from a project whose tasks are not enabled, which is worth one
+* more request on a path that has already failed.
+*/
+async function reportUnknownTask(server, cwd) {
+	const response = await fetchTasks(server);
+	if (!response.ok) {
+		if (response.status === 404) logger.info(missingTaskRoutesHint());
+		return;
+	}
+	const names = Object.keys(response.data?.tasks || {}).sort();
+	logger.info(names.length === 0 ? await emptyTaskListHint(cwd) : `Available tasks: ${names.map((name) => styleText("cyan", name)).join(", ")}`);
+}
+async function resolveTasksDir(cwd) {
+	try {
+		const config = await getNuxtConfig(cwd);
+		return join(config.serverDir || join(config.srcDir || ".", "server"), "tasks");
+	} catch {
+		return "server/tasks";
+	}
+}
+function hasFiles(dir) {
+	try {
+		return readdirSync(dir).length > 0;
+	} catch {
+		return false;
+	}
+}
+function format(value) {
+	return typeof value === "string" ? value : highlight(JSON.stringify(value, null, 2), "json");
+}
+async function request(server, path, options = {}) {
+	const headers = {
+		accept: "application/json",
+		...options.headers
+	};
+	try {
+		return server.socketPath ? await socketRequest(server.socketPath, path, {
+			...options,
+			headers
+		}) : await httpRequest(`${server.base}${path}`, {
+			...options,
+			headers
+		});
+	} catch (error) {
+		if (server.socketPath) {
+			logger.error(`Could not reach the Nitro dev worker on ${styleText("cyan", describeSocket(server.socketPath))}: ${error.message}. Is the dev server still running?`);
+			process.exit(1);
+		}
+		logNetworkError(error, { url: `${server.base}${path}` });
+		process.exit(1);
+	}
+}
+async function httpRequest(url, options) {
+	const response = await fetch(url, options);
+	return {
+		ok: response.ok,
+		status: response.status,
+		data: parseBody(await response.text())
+	};
+}
+/**
+* Nitro's dev worker usually listens on a unix socket rather than a port, which
+* `fetch` cannot dial.
+*/
+function socketRequest(socketPath, path, options) {
+	return new Promise((resolve, reject) => {
+		const req = http.request({
+			socketPath,
+			path,
+			method: options.method || "GET",
+			headers: options.headers
+		}, (res) => {
+			res.setEncoding("utf-8");
+			let body = "";
+			res.on("data", (chunk) => {
+				body += chunk;
+			});
+			res.on("error", reject);
+			res.on("end", () => {
+				const status = res.statusCode || 0;
+				resolve({
+					ok: status >= 200 && status < 300,
+					status,
+					data: parseBody(body)
+				});
+			});
+		});
+		req.on("error", reject);
+		if (options.body) req.write(options.body);
+		req.end();
+	});
+}
+function parseBody(text) {
+	if (!text) return;
+	try {
+		return JSON.parse(text);
+	} catch {
+		return text;
+	}
+}
+/** Abstract sockets start with a null byte, conventionally shown as `@`. */
+function describeSocket(socketPath) {
+	return socketPath.replace(/\0/g, "@");
+}
+//#endregion
+export { reportTaskError as a, runTask as c, missingTaskRoutesHint as i, taskArgs as l, fetchTasks as n, reportUnknownTask as o, format as r, resolveTaskServer as s, emptyTaskListHint as t };
