@@ -42,7 +42,7 @@
           <span class="contact-arrow">↗</span>
         </a>
         <!-- WhatsApp: replace 989123456789 with your number (country code, no +, no leading 0) -->
-        <a class="contact-card" href="https://wa.me/989123456789?text=Hi%20Amir%2C%20I%20saw%20your%20portfolio" target="_blank" rel="noopener" data-cursor="CHAT">
+        <a class="contact-card" href="https://wa.me/@amirhossien.Taghiloo?text=Hi%20Amir%2C%20I%20saw%20your%20portfolio" target="_blank" rel="noopener" data-cursor="CHAT">
           <span class="contact-icon whatsapp-bg"><img class="icon-whatsapp" src="/whatsapp.png" alt=""></span>
           <div><small>QUICK CHAT</small><strong>WhatsApp</strong></div>
           <span class="contact-arrow">↗</span>
