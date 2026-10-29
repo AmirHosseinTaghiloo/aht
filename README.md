@@ -5,20 +5,6 @@
 
 ساخته‌شده با ❤️ و با استفاده از **Nuxt.js** و **Vue.js**
 
-```{=html}
-<p>
-```
-`<a href="https://github.com/AmirHosseinTaghiloo/aht">`{=html}
-`<img src="https://img.shields.io/badge/Repository-AHT-181717?style=for-the-badge&logo=github" alt="GitHub Repository">`{=html}
-`</a>`{=html} `<a href="https://nuxt.com/">`{=html}
-`<img src="https://img.shields.io/badge/Nuxt.js-Framework-00DC82?style=for-the-badge&logo=nuxtdotjs&logoColor=white" alt="Nuxt.js">`{=html}
-`</a>`{=html} `<a href="https://vuejs.org/">`{=html}
-`<img src="https://img.shields.io/badge/Vue.js-Frontend-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white" alt="Vue.js">`{=html}
-`</a>`{=html}
-```{=html}
-</p>
-```
-:::
 
 ------------------------------------------------------------------------
 
@@ -191,7 +177,7 @@ Nuxt از روش‌های مختلف رندرینگ پشتیبانی می‌کن
 Showcasing projects, technical skills, and professional links through a
 responsive, visually engaging experience.
 
-[![Nuxt](https://img.shields.io/badge/Nuxt.js-3-00DC82?style=for-the-badge&logo=nuxtdotjs&logoColor=white)](https://nuxt.com/)
+[![Nuxt](https://img.shields.io/badge/Nuxt.js-4-00DC82?style=for-the-badge&logo=nuxtdotjs&logoColor=white)](https://nuxt.com/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Portfolio](https://img.shields.io/badge/Portfolio-AHT-111827?style=for-the-badge)](https://github.com/AmirHosseinTaghiloo/aht)
 :::
