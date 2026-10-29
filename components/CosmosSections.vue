@@ -57,6 +57,8 @@
 </div>
 </template>
 <script setup lang="ts">
+import { onMounted } from 'vue'
+
 onMounted(() => {
   const $ = (s: string) => document.querySelector(s) as HTMLElement
   const all = (s: string) => [...document.querySelectorAll(s)] as HTMLElement[]

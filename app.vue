@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+
 const projects = [
   { n: '01', name: 'NEXORA', desc: 'Modern creative digital agency website with a futuristic design, smooth animations and a fully responsive layout.', tags: ['Vue.js', 'Nuxt.js', 'Tailwind CSS'], url: '#', g: 'from-indigo-900 via-purple-900 to-black', h: 'We build digital experiences that matter.' },
   { n: '02', name: 'ASA SHOP', desc: 'E-commerce website with a clean and modern design, built for a smooth shopping experience and high performance.', tags: ['Vue.js', 'Nuxt.js', 'TypeScript'], url: '#', g: 'from-orange-100 via-white to-orange-200', h: 'The Best Products For a Better Life', dark: true },
