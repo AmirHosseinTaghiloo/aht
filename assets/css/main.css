@@ -90,3 +90,86 @@ body.hov .cur-dot{opacity:0}
 a,button,.glass,.skill-tile,.contact-card,.quote-card{transition:translate .3s,box-shadow .3s,border-color .3s,background .3s,filter .3s}
 a:hover,.skill-tile:hover,.contact-card:hover,.glass:hover{translate:0 -4px}
 .glass:hover,.skill-tile:hover,.contact-card:hover{box-shadow:0 10px 40px rgba(255,106,26,.25);border-color:rgba(255,140,60,.55)}
+
+
+/* Mobile fit fix: keep the navigation reachable and prevent hero content clipping */
+@media (max-width: 767px) {
+  html, body, #__nuxt { width: 100%; max-width: 100%; overflow-x: clip; }
+  header.fixed { min-height: 64px; padding: 12px 18px; }
+  header.fixed > b { position: relative; z-index: 61; }
+  header.fixed > button { position: relative; z-index: 62; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 44px; }
+  header.fixed > nav.md\:hidden {
+    position: fixed !important;
+    top: 64px !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 60;
+    width: 100vw;
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+    padding: 22px 24px calc(22px + env(safe-area-inset-bottom));
+    background: rgba(5, 6, 10, .97);
+    border-top: 1px solid rgba(255, 137, 59, .22);
+    box-shadow: 0 24px 50px rgba(0,0,0,.45);
+  }
+  #home { height: 100svh !important; min-height: 680px; }
+  #home > .sticky {
+    height: 100svh;
+    min-height: 680px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  #home .sticky > div.max-w-md {
+    left: 20px !important;
+    right: 20px;
+    top: 18% !important;
+    width: auto;
+    max-width: 440px;
+    z-index: 6;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  #home .sticky > div.max-w-md h1 {
+    font-size: clamp(2.35rem, 9.5vw, 3.4rem);
+    line-height: .98;
+    letter-spacing: -.055em;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+    text-shadow: 0 3px 24px rgba(0,0,0,.85);
+  }
+  #home .sticky > div.max-w-md p { text-shadow: 0 2px 12px rgba(0,0,0,.95); }
+  #home .sticky > div.max-w-md p.mt-4 { font-size: 1rem; line-height: 1.4; }
+  #home .sticky > div.max-w-md p.mt-3.text-sm { font-size: .8rem; line-height: 1.5; max-width: 34rem; }
+  #home .sticky > div.max-w-md p.mt-3.text-xs { font-size: .68rem; line-height: 1.45; }
+  #home .sticky > div.max-w-md .mt-6 { margin-top: 14px; gap: 8px; }
+  #home .sticky > div.max-w-md .mt-6 a { padding: 10px 13px; min-height: 42px; font-size: .72rem; }
+  #home .sticky > img {
+    height: 58svh !important;
+    width: auto;
+    max-width: 100vw;
+    object-fit: contain;
+    object-position: bottom center;
+    opacity: .8 !important;
+    transform: translateX(-50%) !important;
+    z-index: 2;
+    pointer-events: none;
+  }
+  #home .sticky > div.glass { display: none !important; }
+  #home .sticky > p { display: none; }
+  #home .sticky > div.pat-rings { width: 112vmin; height: 112vmin; }
+}
+@media (max-width: 390px) {
+  #home { min-height: 650px; }
+  #home > .sticky { min-height: 650px; }
+  #home .sticky > div.max-w-md { left: 16px !important; right: 16px; top: 17% !important; }
+  #home .sticky > div.max-w-md h1 { font-size: clamp(2.15rem, 9vw, 2.6rem); }
+  #home .sticky > div.max-w-md p.mt-3.text-sm { font-size: .74rem; }
+  #home .sticky > div.max-w-md .mt-6 a { padding: 9px 10px; font-size: .67rem; }
+  #home .sticky > img { height: 54svh !important; }
+}
+@media (max-height: 700px) and (max-width: 767px) {
+  #home, #home > .sticky { min-height: 620px; }
+  #home .sticky > div.max-w-md { top: 15% !important; }
+  #home .sticky > div.max-w-md h1 { font-size: clamp(2rem, 8vw, 2.7rem); }
+  #home .sticky > img { height: 52svh !important; }
+}
