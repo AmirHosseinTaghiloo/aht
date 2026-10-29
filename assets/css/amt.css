@@ -43,3 +43,91 @@ a{color:inherit;text-decoration:none}button{font:inherit}a,button{-webkit-tap-hi
 /* The scroll portal: a 220vh in-between chapter with a sticky vortex */
 .portal-journey{position:relative;height:220vh;z-index:1}.portal-sticky{height:100vh;min-height:650px;position:sticky;top:0;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse 38% 56% at 50% 50%,#25141977,#07090e00 88%)}.portal-overline{position:absolute;z-index:3;top:11%;left:8%;font:700 10px 'Courier New',monospace;letter-spacing:.23em;color:#f69f6c}.portal-glow{position:absolute;width:min(78vw,950px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#ec632b22,#fe6b1533 27%,transparent 64%);filter:blur(38px)}.portal-torus{position:absolute;width:min(68vw,790px);aspect-ratio:1;border:1px solid #ff9d5859;border-radius:50%;transform:rotate(-24deg);box-shadow:0 0 75px #fb5d261c,inset 0 0 85px #fb5d2612;will-change:transform}.portal-torus:before,.portal-torus:after{content:'';position:absolute;border-radius:50%;border:1px solid #ff995c37}.portal-torus:before{inset:15%;transform:rotate(60deg) scaleX(.66)}.portal-torus:after{inset:-7% 13%;transform:rotate(-60deg) scaleX(.58)}.portal-torus-inner{position:absolute;inset:31%;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ffad78,#ae522d 34%,#321c29 62%,#081222 76%);box-shadow:inset -12px -10px 25px #000d,0 0 62px #f0783037}.portal-torus-planet{position:absolute;top:3%;right:17%;width:19px;height:19px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff1cc,#fc8759 33%,#713623 80%);box-shadow:0 0 19px #ffab62}.portal-torus-star{color:#efac77;position:absolute;font-size:33px;filter:drop-shadow(0 0 12px #fa6d36)}.portal-torus .star-one{top:36%;left:-4%}.portal-torus .star-two{right:9%;bottom:12%}.portal-title-wrap{z-index:2;position:relative;text-align:center;will-change:transform}.portal-title-wrap h2{font:700 clamp(62px,9.4vw,151px)/.88 var(--font-display);letter-spacing:-.105em;margin:22px 0;text-shadow:0 6px 38px #000b}.portal-title-wrap h2 span{color:#ffa060}.portal-title-wrap p{font-size:14px;color:#b5b6c0;max-width:350px;margin:28px auto;line-height:1.9}.portal-side-number{font:700 10px 'Courier New',monospace;letter-spacing:.2em;color:#ffbf96}.portal-bottom-label,.portal-bottom-index{position:absolute;bottom:9%;font:700 9px 'Courier New',monospace;letter-spacing:.18em;color:#828896}.portal-bottom-label{left:8%}.portal-bottom-index{right:8%;color:#f59d65}
 @media(max-width:640px){.portal-journey{height:150vh}.portal-sticky{height:100svh;min-height:550px}.portal-torus{width:112vw}.portal-title-wrap h2{font-size:clamp(52px,13vw,85px)}.portal-title-wrap p{font-size:12px;max-width:270px}.portal-overline{top:10%;left:5%;font-size:8px}.portal-bottom-label,.portal-bottom-index{bottom:7%;font-size:7px}.portal-bottom-label{left:5%}.portal-bottom-index{right:5%}}
+
+
+/* Responsive polish: touch devices, compact phones and tablet layouts */
+:root { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+img, video, canvas, svg { max-width: 100%; }
+button, a { touch-action: manipulation; }
+html, body { max-width: 100%; }
+body { overflow-x: clip; }
+@media (hover: none), (pointer: coarse) {
+  body, body a, body button { cursor: auto !important; }
+  .cursor-ring, .cursor-dot, .cur-dot, .cur-ring { display: none !important; }
+  a:hover, .skill-tile:hover, .contact-card:hover, .glass:hover { translate: none; }
+  .btn:hover { transform: none; }
+}
+@media (max-width: 900px) {
+  .site-header { gap: 14px; }
+  .nav-actions { gap: 8px; }
+  .hero-inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .hero-copy, .hero-visual, .about-copy, .about-art, .project-content, .project-showcase-link { min-width: 0; }
+  .hero-copy h1 { overflow-wrap: anywhere; }
+  .project-tech { flex-wrap: wrap; }
+  .browser-frame { max-width: 100%; }
+  .contact-card > div { min-width: 0; }
+  .contact-card strong { overflow-wrap: anywhere; }
+}
+@media (max-width: 640px) {
+  .content-width, .site-header { width: calc(100% - 32px); }
+  .site-header { gap: 10px; }
+  .brand { gap: 8px; }
+  .nav-actions { margin-left: auto; }
+  .nav-resume { white-space: nowrap; }
+  .mobile-menu { right: 0; left: 0; width: 100%; max-height: calc(100svh - 88px); overflow-y: auto; }
+  .hero-section { overflow: hidden; }
+  .hero-copy h1 { overflow-wrap: anywhere; letter-spacing: -.07em; }
+  .hero-buttons .btn { flex: 0 1 auto; }
+  .hero-indicators { row-gap: 10px; }
+  .hero-visual { overflow: visible; }
+  .chapter-heading { gap: 12px; }
+  .chapter-index { font-size: 9px; letter-spacing: .12em; }
+  .about-grid, .contact-inner { min-width: 0; }
+  .facts-strip { min-width: 0; }
+  .facts-strip > div { min-width: 0; }
+  .facts-strip strong { overflow-wrap: anywhere; }
+  .skill-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skill-tile { min-width: 0; }
+  .projects-intro { min-width: 0; }
+  .project-chapter { width: calc(100% - 32px); }
+  .project-content h3 { overflow-wrap: anywhere; }
+  .project-tech span { max-width: 100%; }
+  .project-showcase-link, .project-visual, .browser-frame { width: 100%; min-width: 0; }
+  .browser-address { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-visual { perspective: 900px; }
+  .demo-nexora-main img, .demo-asa-main img, .demo-pc-main img { max-width: 100%; height: auto; }
+  .contact-inner { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .contact-cards { width: 100%; min-width: 0; }
+  .contact-card { display: grid; grid-template-columns: 38px minmax(0, 1fr) 16px; gap: 12px; }
+  .contact-card > div { min-width: 0; }
+  .contact-card strong { display: block; max-width: 100%; overflow-wrap: anywhere; }
+  .site-footer { display: flex; align-items: center; gap: 14px; }
+  .site-footer > span { text-align: right; }
+  .portal-title-wrap { width: calc(100% - 32px); }
+  .portal-title-wrap h2 { letter-spacing: -.08em; overflow-wrap: anywhere; }
+  .portal-torus { max-width: 112vw; }
+  #preview-dialog { padding: 12px !important; overflow-y: auto; }
+  #preview-dialog > div { width: 100% !important; max-height: calc(100svh - 24px); overflow-y: auto; padding: 28px 20px !important; }
+  #dialog-title { font-size: clamp(32px, 10vw, 48px) !important; overflow-wrap: anywhere; }
+}
+@media (max-width: 420px) {
+  .site-header, .content-width { width: calc(100% - 28px); }
+  .brand { font-size: 20px; }
+  .brand-orbit { width: 28px; height: 24px; }
+  .nav-resume { padding: 8px 9px; font-size: 9px; }
+  .hero-copy h1 { font-size: clamp(43px, 11.4vw, 54px); }
+  .hero-buttons { align-items: stretch; }
+  .hero-buttons .btn { min-height: 42px; padding-inline: 11px; }
+  .hero-indicators { gap: 10px; }
+  .about-section h2, .skills-section h2, .projects-intro h2, .contact-section h2 { font-size: clamp(36px, 9.6vw, 46px); }
+  .skill-tile { height: 124px; padding: 12px; }
+  .skill-icon { height: 46px; width: 46px; }
+  .project-number { font-size: 38px; }
+  .project-chapter { padding-bottom: 80px; }
+  .contact-card { padding: 12px; }
+  .contact-card strong { font-size: 12px; }
+  .site-footer > span { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; }
+}

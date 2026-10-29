@@ -18,9 +18,15 @@ onMounted(() => {
   const onScroll = () => {
     sy = scrollY
     const vh = innerHeight
-    root.style.setProperty('--hero', String(clamp(sy / (vh * 2.2))))
-    const pr = document.getElementById('projects')!
-    root.style.setProperty('--proj', String(clamp((sy - pr.offsetTop) / (pr.offsetHeight - vh))))
+    // Keep the hero animation local to its own section. Using page scrollY here
+    // made the portrait and text fade before the visitor had finished the hero.
+    const home = document.getElementById('home')
+    if (home) {
+      const heroTravel = Math.max(1, home.offsetHeight - vh)
+      root.style.setProperty('--hero', String(clamp((sy - home.offsetTop) / heroTravel)))
+    }
+    const pr = document.getElementById('projects')
+    if (pr) root.style.setProperty('--proj', String(clamp((sy - pr.offsetTop) / Math.max(1, pr.offsetHeight - vh))))
     root.style.setProperty('--sy', String(sy))
   }
   addEventListener('scroll', onScroll, { passive: true }); onScroll()

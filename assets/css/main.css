@@ -90,3 +90,96 @@ body.hov .cur-dot{opacity:0}
 a,button,.glass,.skill-tile,.contact-card,.quote-card{transition:translate .3s,box-shadow .3s,border-color .3s,background .3s,filter .3s}
 a:hover,.skill-tile:hover,.contact-card:hover,.glass:hover{translate:0 -4px}
 .glass:hover,.skill-tile:hover,.contact-card:hover{box-shadow:0 10px 40px rgba(255,106,26,.25);border-color:rgba(255,140,60,.55)}
+
+
+/* Responsive support for the scroll-animated AHT hero */
+@media (hover: none), (pointer: coarse) {
+  body, body a, body button { cursor: auto !important; }
+  .cur-dot, .cur-ring { display: none !important; }
+}
+@media (max-width: 767px) {
+  #home { height: 220vh !important; }
+  #home .sticky { height: 100svh; }
+  #home .sticky > img { height: 64svh !important; max-width: 100vw; object-fit: contain; object-position: bottom center; }
+  #home .sticky > div.max-w-md { left: 18px !important; right: 18px; top: 23% !important; width: auto; max-width: none; }
+  #home .sticky > div.max-w-md h1 { font-size: clamp(2rem, 8.8vw, 3rem); line-height: 1.02; overflow-wrap: anywhere; }
+  #home .sticky > div.max-w-md p { max-width: 34rem; }
+  #home .sticky > div.max-w-md .mt-6 { gap: 8px; }
+  #home .sticky > div.max-w-md .mt-6 a { padding: 10px 14px; font-size: 12px; }
+  #home .sticky > div.glass { display: none; }
+  #home .pat-rings { width: 130vmin; height: 130vmin; }
+  #home .planet { width: 72vmin; height: 72vmin; }
+  #home .sticky > p { right: 12px; bottom: 12px; font-size: 8px; }
+  header.fixed { padding: 14px 18px; }
+  header.fixed > nav:last-child { max-height: calc(100svh - 78px); overflow-y: auto; }
+}
+@media (max-width: 420px) {
+  #home { height: 200vh !important; }
+  #home .sticky > img { height: 56svh !important; }
+  #home .sticky > div.max-w-md { top: 20% !important; }
+  #home .sticky > div.max-w-md h1 { font-size: clamp(1.85rem, 8.5vw, 2.35rem); }
+  #home .sticky > div.max-w-md .mt-6 a { padding: 9px 11px; font-size: 11px; }
+}
+
+
+/* Mobile hero refinement — preserve the current design while fixing fit/readability */
+@media (max-width: 767px) {
+  #home { height: 220svh !important; }
+  #home > .sticky {
+    height: 100svh;
+    min-height: 560px;
+    isolation: isolate;
+  }
+  #home .sticky > img {
+    height: 64svh !important;
+    width: auto;
+    max-width: 100vw;
+    bottom: 0;
+    left: 50%;
+    object-fit: contain;
+    object-position: bottom center;
+    opacity: calc(.88 - var(--hero, 0) * 1.1) !important;
+    filter: drop-shadow(0 0 28px rgba(255,106,26,.3));
+    pointer-events: none;
+  }
+  #home .sticky > div.max-w-md {
+    z-index: 5;
+    top: 23% !important;
+    left: 18px !important;
+    right: 18px;
+    width: auto;
+    max-width: 390px;
+    padding: 0;
+    transform: translateY(calc(var(--hero, 0) * -24vh)) !important;
+    opacity: calc(1 - var(--hero, 0) * 1.2) !important;
+  }
+  #home .sticky > div.max-w-md h1 {
+    max-width: 100%;
+    font-size: clamp(2.25rem, 10.3vw, 3.15rem);
+    line-height: .98;
+    letter-spacing: -.055em;
+    overflow-wrap: normal;
+    text-wrap: balance;
+    text-shadow: 0 2px 24px rgba(0,0,0,.65);
+  }
+  #home .sticky > div.max-w-md p { text-shadow: 0 1px 12px rgba(0,0,0,.95); }
+  #home .sticky > div.max-w-md p.mt-4 { font-size: 1rem; line-height: 1.4; }
+  #home .sticky > div.max-w-md p.mt-3.text-sm { max-width: 31rem; font-size: .8rem; line-height: 1.55; }
+  #home .sticky > div.max-w-md p.mt-3.text-xs { max-width: 31rem; font-size: .68rem; line-height: 1.45; }
+  #home .sticky > div.max-w-md .mt-6 { margin-top: 1rem; gap: .55rem; }
+  #home .sticky > div.max-w-md .mt-6 a { min-height: 42px; padding: 10px 14px; font-size: .72rem; white-space: nowrap; }
+  #home .sticky > div.glass { display: none !important; }
+  #home .sticky > p { display: none; }
+  #home .pat-rings { width: 112vmin; height: 112vmin; }
+  #home .planet { width: 72vmin; height: 72vmin; }
+}
+@media (max-width: 390px) {
+  #home .sticky > div.max-w-md { top: 24% !important; left: 16px !important; right: 16px; }
+  #home .sticky > div.max-w-md h1 { font-size: clamp(2.1rem, 9.8vw, 2.55rem); }
+  #home .sticky > div.max-w-md p.mt-3.text-sm { font-size: .74rem; }
+  #home .sticky > div.max-w-md .mt-6 a { padding: 9px 11px; font-size: .68rem; }
+  #home .sticky > img { height: 59svh !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #home .sticky > img, #home .sticky > div.max-w-md { transform: none !important; }
+}
