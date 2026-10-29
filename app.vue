@@ -27,27 +27,43 @@ onMounted(() => {
   // reveal
   const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('in')), { threshold: .2 })
   document.querySelectorAll('.reveal').forEach(el => io.observe(el))
-  // cursor
+  // Cursor effects are only enabled on devices with a precise pointer.
   const dot = document.querySelector('.cur-dot') as HTMLElement, ring = document.querySelector('.cur-ring') as HTMLElement
+  const desktopPointer = matchMedia('(pointer: fine)').matches
   let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my
-  addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY })
-  document.addEventListener('mouseover', e => {
-    const t = (e.target as HTMLElement).closest('[data-cur],[data-cursor]') as HTMLElement | null
-    document.body.classList.toggle('hov', !!t); label.value = t?.dataset.cur || t?.dataset.cursor || ''
-  })
-  // starfield (speed reacts to scroll)
+  if (desktopPointer) {
+    addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY }, { passive: true })
+    document.addEventListener('mouseover', e => {
+      const t = (e.target as HTMLElement).closest('[data-cur],[data-cursor]') as HTMLElement | null
+      document.body.classList.toggle('hov', !!t); label.value = t?.dataset.cur || t?.dataset.cursor || ''
+    })
+  }
+  // A lighter starfield on phones keeps scrolling smooth without changing desktop visuals.
   const c = canvas.value!, x = c.getContext('2d')!
-  const resize = () => { c.width = innerWidth; c.height = innerHeight }; resize(); addEventListener('resize', resize)
-  const stars = Array.from({ length: 260 }, () => ({ x: Math.random(), y: Math.random(), z: Math.random() * 2 + .2 }))
+  const mobileStars = () => matchMedia('(max-width: 767px), (pointer: coarse)').matches
+  let starCount = 0
+  let stars: { x: number; y: number; z: number }[] = []
+  const resize = () => {
+    c.width = innerWidth; c.height = innerHeight
+    const count = mobileStars() ? 72 : 260
+    if (count !== starCount) {
+      starCount = count
+      stars = Array.from({ length: count }, () => ({ x: Math.random(), y: Math.random(), z: Math.random() * 2 + .2 }))
+    }
+  }
+  resize(); addEventListener('resize', resize, { passive: true })
   const loop = () => {
-    rx += (mx - rx) * .15; ry += (my - ry) * .15
-    dot.style.transform = `translate(${mx}px,${my}px)`; ring.style.transform = `translate(${rx}px,${ry}px)`
+    if (desktopPointer) {
+      rx += (mx - rx) * .15; ry += (my - ry) * .15
+      dot.style.transform = `translate(${mx}px,${my}px)`; ring.style.transform = `translate(${rx}px,${ry}px)`
+    }
     vel += ((sy - last) - vel) * .1; last = sy
     x.clearRect(0, 0, c.width, c.height)
     for (const s of stars) {
-      s.y = (s.y - (s.z * (.00015 + Math.abs(vel) * .0004)) + 1) % 1
+      const drift = mobileStars() ? .00024 : .00015
+      s.y = (s.y - (s.z * (drift + Math.abs(vel) * .0004)) + 1) % 1
       x.fillStyle = `rgba(255,${200 + s.z * 20},${160 + s.z * 30},${.3 + s.z * .3})`
-      x.fillRect(s.x * c.width + (mx - c.width / 2) * .01 * s.z, s.y * c.height, s.z, s.z + Math.abs(vel) * s.z * .6)
+      x.fillRect(s.x * c.width + (desktopPointer ? (mx - c.width / 2) * .01 * s.z : 0), s.y * c.height, s.z, s.z + Math.abs(vel) * s.z * .6)
     }
     requestAnimationFrame(loop)
   }; loop()
