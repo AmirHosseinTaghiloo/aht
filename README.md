@@ -1,4 +1,4 @@
-::: {align="center" dir="rtl"}
+
 # 🚀 AHT \| وب‌سایت پورتفولیوی شخصی
 
 ### ✨ معرفی من، مهارت‌ها و پروژه‌هایم در یک تجربه مدرن و تعاملی
@@ -160,7 +160,7 @@ Nuxt از روش‌های مختلف رندرینگ پشتیبانی می‌کن
 
 ------------------------------------------------------------------------
 
-::: {align="center" dir="rtl"}
+
 ### 💚 ممنون که از پروژه AHT بازدید کردی!
 
 **ساخته‌شده با Nuxt.js و Vue.js توسط امیرحسین تقی‌لو**
@@ -169,7 +169,7 @@ Nuxt از روش‌های مختلف رندرینگ پشتیبانی می‌کن
 
 
 
-::: {align="center"}
+
 # AHT --- Personal Portfolio
 
 **A modern, interactive portfolio built with Nuxt.js and Vue.js**
@@ -341,6 +341,6 @@ this repository to discuss a potential improvement.
 
 ------------------------------------------------------------------------
 
-::: {align="center"}
+
 Made with Nuxt.js and Vue.js by **Amir Hossein Taghiloo**
-:::
+
